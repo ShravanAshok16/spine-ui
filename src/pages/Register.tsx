@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { toast } from 'sonner';
@@ -12,23 +12,18 @@ export default function Register() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [displayName, setDisplayName] = useState('');
+  // null = user hasn't typed yet (auto-fill from names); string = user is controlling it
+  const [displayNameInput, setDisplayNameInput] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Auto-fill displayName from firstName + lastName (only if user hasn't manually edited it)
-  const [displayNameTouched, setDisplayNameTouched] = useState(false);
-  useEffect(() => {
-    if (!displayNameTouched) {
-      const auto = `${firstName} ${lastName}`.trim();
-      setDisplayName(auto);
-    }
-  }, [firstName, lastName, displayNameTouched]);
+  // Derived: if user hasn't typed, show "{firstName} {lastName}". Otherwise, show what they typed.
+  const displayName =
+    displayNameInput ?? `${firstName} ${lastName}`.trim();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Frontend validation for immediate feedback
     if (password !== confirmPassword) {
       toast.error('Passwords do not match');
       return;
@@ -47,23 +42,14 @@ export default function Register() {
         firstName,
         lastName,
         phoneNumber,
-        displayName: displayName.trim() || `${firstName} ${lastName}`.trim(),
+        displayName: displayName.trim(),
       };
 
       await apiClient.post('/api/Auth/register', payload);
-      toast.success('Account created! Please log in.');
+      toast.success('Account created! Please check your email to verify, then log in.');
       navigate('/login');
     } catch (err: any) {
-      // Surface backend FluentValidation errors if present
-      const data = err.response?.data;
-      const message =
-        data?.error ||
-        data?.errors?.[0] ||
-        (typeof data === 'object' && data !== null
-          ? Object.values(data).flat().join(' ')
-          : null) ||
-        'Registration failed';
-      toast.error(String(message));
+      toast.error(err.message || 'Registration failed');
     } finally {
       setLoading(false);
     }
@@ -74,7 +60,7 @@ export default function Register() {
 
   return (
     <div className="min-h-screen flex bg-bg">
-      {/* Left Side - Image with Color Overlay (matches Login) */}
+      {/* Left Side - Image with Color Overlay */}
       <div className="hidden lg:flex w-1/2 relative overflow-hidden">
         <img
           src={libraryBg}
@@ -96,7 +82,7 @@ export default function Register() {
               Start building your library today.
             </h1>
             <p className="text-lg text-white/80">
-              Join thousands of readers cataloging their shelves, tracking progress, and sharing books with friends.
+              Catalog your shelves, track your progress, and share books with friends — all in one place.
             </p>
           </div>
 
@@ -119,7 +105,6 @@ export default function Register() {
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Name row */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium mb-1.5">First name</label>
@@ -129,6 +114,7 @@ export default function Register() {
                   onChange={(e) => setFirstName(e.target.value)}
                   className={inputClass}
                   placeholder="Ada"
+                  autoComplete="given-name"
                   required
                 />
               </div>
@@ -140,6 +126,7 @@ export default function Register() {
                   onChange={(e) => setLastName(e.target.value)}
                   className={inputClass}
                   placeholder="Lovelace"
+                  autoComplete="family-name"
                   required
                 />
               </div>
@@ -150,10 +137,7 @@ export default function Register() {
               <input
                 type="text"
                 value={displayName}
-                onChange={(e) => {
-                  setDisplayName(e.target.value);
-                  setDisplayNameTouched(true);
-                }}
+                onChange={(e) => setDisplayNameInput(e.target.value)}
                 className={inputClass}
                 placeholder="How others will see you"
               />
@@ -167,6 +151,7 @@ export default function Register() {
                 onChange={(e) => setEmail(e.target.value)}
                 className={inputClass}
                 placeholder="you@example.com"
+                autoComplete="email"
                 required
               />
             </div>
@@ -179,6 +164,7 @@ export default function Register() {
                 onChange={(e) => setPhoneNumber(e.target.value)}
                 className={inputClass}
                 placeholder="+1 (555) 123-4567"
+                autoComplete="tel"
               />
             </div>
 
@@ -191,6 +177,7 @@ export default function Register() {
                   onChange={(e) => setPassword(e.target.value)}
                   className={inputClass}
                   placeholder="••••••••"
+                  autoComplete="new-password"
                   required
                   minLength={8}
                 />
@@ -203,6 +190,7 @@ export default function Register() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className={inputClass}
                   placeholder="••••••••"
+                  autoComplete="new-password"
                   required
                   minLength={8}
                 />

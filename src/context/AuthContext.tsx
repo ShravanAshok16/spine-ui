@@ -1,5 +1,4 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { apiClient } from '../api/client';
 
 interface AuthContextType {
   token: string | null;
@@ -10,7 +9,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(localStorage.getItem('spine_token'));
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem('spine_token'));
 
   const login = (newToken: string) => {
     localStorage.setItem('spine_token', newToken);
@@ -21,6 +20,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('spine_token');
     setToken(null);
   };
+
+  // React to 401 from any API call
+  useEffect(() => {
+    const handleUnauthorized = () => logout();
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
+  }, []);
 
   return (
     <AuthContext.Provider value={{ token, login, logout }}>
