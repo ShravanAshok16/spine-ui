@@ -15,3 +15,10 @@ export interface UserBook {
   addedAt: string;
   readingSessionCount?: number;
 }
+
+export interface Quote {
+  text: string;
+  pageNumber: number;
+  bookTitle: string;
+  author: string;
+}

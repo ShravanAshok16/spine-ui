@@ -1,5 +1,6 @@
-import { useState, type SyntheticEvent } from 'react';
+import { useState, type SyntheticEvent, useMemo } from 'react';
 import { BookOpen } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { cn } from '../lib/utils';
 import type { UserBook } from '../api/types';
 
@@ -16,26 +17,41 @@ const statusStyles: Record<string, string> = {
   DNF: 'bg-red-500/90 text-white',
 };
 
+const gradients = [
+  'from-indigo-500 to-purple-600',
+  'from-emerald-500 to-teal-600',
+  'from-rose-500 to-pink-600',
+  'from-amber-500 to-orange-600',
+  'from-blue-500 to-cyan-600',
+];
+
 export function BookCover({ book, onClick, index = 0 }: Props) {
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
   const showFallback = !book.coverUrl || imageError;
+
+  const gradientClass = useMemo(() => {
+    const charCode = book.title.charCodeAt(0) || 0;
+    return gradients[charCode % gradients.length];
+  }, [book.title]);
 
   const handleImageLoad = (e: SyntheticEvent<HTMLImageElement>) => {
     if (e.currentTarget.naturalWidth < 10) setImageError(true);
     setImageLoading(false);
   };
 
-  // Extract first genre for the chip
   const primaryGenre = book.genres?.split(',')[0]?.trim();
 
   return (
-    <div
+    <motion.div
+      whileHover={{ y: -5 }}
+      whileTap={{ scale: 0.98 }}
       onClick={onClick}
       className="group cursor-pointer flex flex-col gap-3 animate-fade-up"
       style={{ animationDelay: `${index * 30}ms` }}
     >
-      <div className="relative aspect-[2/3] w-full rounded-lg overflow-hidden bg-surface border border-border shadow-sm group-hover:shadow-md transition-all duration-200 group-hover:-translate-y-1">
+      <div className="relative aspect-[2/3] w-full rounded-lg overflow-hidden bg-surface border border-border shadow-sm transition-all duration-200">
+        
         {imageLoading && !showFallback && (
           <div className="absolute inset-0 bg-surface-hover animate-pulse" />
         )}
@@ -53,28 +69,35 @@ export function BookCover({ book, onClick, index = 0 }: Props) {
           />
         )}
 
+        {/* 🔥 Generated Gradient Fallback */}
         {showFallback && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-4 bg-primary/10">
-            <BookOpen className="w-8 h-8 text-primary/40 mb-2" />
-            <p className="text-xs text-center text-text-muted font-serif line-clamp-3">
-              {book.title}
-            </p>
+          <div className={cn("absolute inset-0 flex flex-col justify-between p-4 bg-gradient-to-br text-white", gradientClass)}>
+            <div className="opacity-50">
+              <BookOpen className="w-6 h-6" />
+            </div>
+            <div className="flex-1 flex flex-col justify-center">
+              <h4 className="font-serif font-bold text-lg leading-tight line-clamp-4 drop-shadow-md">
+                {book.title}
+              </h4>
+              <p className="text-xs text-white/80 mt-2 line-clamp-2 uppercase tracking-wider font-medium">
+                {book.author}
+              </p>
+            </div>
+            <div className="text-[10px] text-white/50 uppercase tracking-widest text-right">
+              Spine
+            </div>
           </div>
         )}
 
-        {/* Status Badge */}
         <div className="absolute top-2 right-2">
-          <span
-            className={cn(
-              'text-xs font-medium px-2 py-0.5 rounded-full backdrop-blur-sm',
-              statusStyles[book.status] || statusStyles.Unread
-            )}
-          >
+          <span className={cn(
+            'text-xs font-medium px-2 py-0.5 rounded-full backdrop-blur-sm',
+            statusStyles[book.status] || statusStyles.Unread
+          )}>
             {book.status}
           </span>
         </div>
 
-        {/* Genre Chip */}
         {primaryGenre && (
           <div className="absolute top-2 left-2">
             <span className="text-[10px] uppercase tracking-wider font-medium px-1.5 py-0.5 rounded bg-black/60 text-white backdrop-blur-sm">
@@ -83,7 +106,6 @@ export function BookCover({ book, onClick, index = 0 }: Props) {
           </div>
         )}
 
-        {/* Progress Bar */}
         {book.status === 'Reading' && book.totalPages && (
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/30">
             <div
@@ -100,6 +122,6 @@ export function BookCover({ book, onClick, index = 0 }: Props) {
         </h3>
         <p className="text-xs text-text-muted mt-1 line-clamp-1">{book.author}</p>
       </div>
-    </div>
+    </motion.div>
   );
 }

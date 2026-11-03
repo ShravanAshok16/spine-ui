@@ -1,16 +1,27 @@
-import { Book, BookOpen, CheckCircle, Flame } from 'lucide-react';
+import { Book, BookOpen, CheckCircle, Flame, FileText } from 'lucide-react';
 import type { UserBook } from '../api/types';
 
-export function StatsRow({ books }: { books: UserBook[] }) {
+interface Props {
+  books: UserBook[];
+  onReadingClick?: () => void;
+}
+
+export function StatsRow({ books, onReadingClick }: Props) {
   const total = books.length;
   const reading = books.filter((b) => b.status === 'Reading').length;
   const finished = books.filter((b) => b.status === 'Finished').length;
+  
+  // Calculate Average Pages
+  const booksWithPages = books.filter(b => b.totalPages && b.totalPages > 0);
+  const avgPages = booksWithPages.length > 0 
+    ? Math.round(booksWithPages.reduce((sum, b) => sum + (b.totalPages || 0), 0) / booksWithPages.length)
+    : 0;
 
   const stats = [
     { label: 'Total Books', value: total, icon: Book, color: 'text-primary' },
-    { label: 'Reading', value: reading, icon: BookOpen, color: 'text-blue-500' },
+    { label: 'Reading', value: reading, icon: BookOpen, color: 'text-blue-500', onClick: onReadingClick },
     { label: 'Finished', value: finished, icon: CheckCircle, color: 'text-green-500' },
-    { label: 'Streak', value: '0 days', icon: Flame, color: 'text-orange-500' },
+    { label: 'Avg Pages', value: avgPages, icon: FileText, color: 'text-purple-500' },
   ];
 
   return (
@@ -18,9 +29,13 @@ export function StatsRow({ books }: { books: UserBook[] }) {
       {stats.map((stat) => {
         const Icon = stat.icon;
         return (
-          <div
+          <button
             key={stat.label}
-            className="bg-surface border border-border rounded-xl p-4 flex items-center gap-3"
+            onClick={stat.onClick}
+            disabled={!stat.onClick}
+            className={`bg-surface border border-border rounded-xl p-4 flex items-center gap-3 text-left transition-all ${
+              stat.onClick ? 'hover:shadow-md hover:border-primary/40 cursor-pointer' : 'cursor-default'
+            }`}
           >
             <div className={`w-10 h-10 rounded-lg bg-bg flex items-center justify-center ${stat.color}`}>
               <Icon className="w-5 h-5" />
@@ -29,7 +44,7 @@ export function StatsRow({ books }: { books: UserBook[] }) {
               <p className="text-xs text-text-muted">{stat.label}</p>
               <p className="text-xl font-bold">{stat.value}</p>
             </div>
-          </div>
+          </button>
         );
       })}
     </div>

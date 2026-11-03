@@ -1,4 +1,6 @@
+import { useState, useMemo, type SyntheticEvent } from 'react';
 import { BookOpen, Star } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { cn } from '../lib/utils';
 import type { UserBook } from '../api/types';
 
@@ -7,23 +9,64 @@ interface Props {
   onClick?: () => void;
 }
 
+const gradients = [
+  'from-indigo-500 to-purple-600',
+  'from-emerald-500 to-teal-600',
+  'from-rose-500 to-pink-600',
+  'from-amber-500 to-orange-600',
+  'from-blue-500 to-cyan-600',
+];
+
 export function BookListItem({ book, onClick }: Props) {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
+  const showFallback = !book.coverUrl || imageError;
+
+  const gradientClass = useMemo(() => {
+    const charCode = book.title.charCodeAt(0) || 0;
+    return gradients[charCode % gradients.length];
+  }, [book.title]);
+
+  const handleImageLoad = (e: SyntheticEvent<HTMLImageElement>) => {
+    if (e.currentTarget.naturalWidth < 10) setImageError(true);
+    setImageLoading(false);
+  };
+
   return (
-    <div
+    <motion.div
+      whileHover={{ scale: 1.01 }}
+      whileTap={{ scale: 0.99 }}
       onClick={onClick}
       className="group flex items-center gap-4 p-4 bg-surface border border-border rounded-xl cursor-pointer hover:shadow-md transition-all"
     >
-      {/* Small Cover */}
-      <div className="w-16 h-24 flex-shrink-0 rounded-md overflow-hidden bg-bg border border-border relative">
-        {book.coverUrl ? (
+      {/* Cover Container */}
+      <div className="w-16 h-24 flex-shrink-0 rounded-md overflow-hidden bg-surface border border-border relative">
+        {imageLoading && !showFallback && (
+          <div className="absolute inset-0 bg-surface-hover animate-pulse" />
+        )}
+
+        {!showFallback && (
           <img
-            src={book.coverUrl}
+            src={book.coverUrl!}
             alt={book.title}
-            className="w-full h-full object-cover"
+            onLoad={handleImageLoad}
+            onError={() => setImageError(true)}
+            className={cn(
+              'w-full h-full object-cover transition-opacity duration-300',
+              imageLoading ? 'opacity-0' : 'opacity-100'
+            )}
           />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center bg-primary/5">
-            <BookOpen className="w-6 h-6 text-primary/30" />
+        )}
+
+        {showFallback && (
+          <div className={cn("absolute inset-0 flex flex-col justify-between p-1.5 bg-gradient-to-br text-white", gradientClass)}>
+            <BookOpen className="w-3 h-3 opacity-50" />
+            <p className="text-[8px] font-serif font-bold leading-tight line-clamp-3">
+              {book.title}
+            </p>
+            <p className="text-[6px] text-white/70 uppercase line-clamp-1">
+              {book.author}
+            </p>
           </div>
         )}
       </div>
@@ -55,6 +98,6 @@ export function BookListItem({ book, onClick }: Props) {
           )}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
