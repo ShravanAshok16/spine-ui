@@ -7,10 +7,16 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies & Build
 node_modules
 dist
 dist-ssr
 *.local
+
+# Environment Variables (CRITICAL)
+.env
+.env.local
+.env.*.local
 
 # Editor directories and files
 .vscode/*
@@ -22,4 +28,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-*.env
+
+# Local Notes
+docs/notes.txt
+docs/notes-source-code.txt
+Daily Notes with Setup Instructions.md
+Spine Code Explanation.md
