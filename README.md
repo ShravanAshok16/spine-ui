@@ -5,46 +5,49 @@ A production-grade, responsive React frontend for tracking physical book collect
 🌐 **Live App:** *(Coming in Sprint 7)*  
 🔌 **Backend Repo:** [ShravanAshok16/Spine](https://github.com/ShravanAshok16/Spine)
 
-![Spine Dashboard](public/screenshot-dashboard.png) 
-*(Note: Add a screenshot of your dashboard to the public folder and name it `screenshot-dashboard.png` to make this image render)*
-
 ---
 
 ## 📌 Current Status
 
 **Phase:** Sprint 7 — Web Frontend Core
-**Progress:** `[████░░░░░░] 40%`
+**Progress:** `[█████░░░░░] 50%`
 
 ### ✅ Done
 - **Vite + React 19 + TypeScript** foundation.
-- **Tailwind CSS v4** with custom "Warm Minimalism" theme tokens.
-- **Global ThemeContext** (Dark/Light mode persists via `localStorage`).
-- **Global AuthContext** with JWT decoding and auto-logout on 401.
-- **Axios Interceptor** (Attaches JWT, normalizes FluentValidation errors).
-- **Collapsible Sidebar** (with animated `framer-motion` physics and user profile).
-- **Dashboard Layout** (Holy Grail): Header, Search, and Grid/List view toggle.
-- **Bento Stats Grid:** Total Books, Reading, Finished, Avg Pages.
-- **Continue Reading Hero:** Dynamic banner for the most recent book.
-- **Reading Heatmap:** GitHub-style 5-week activity tracker.
-- **Quote of the Day:** Fetches a random quote from the user's library.
-- **Add Book Modal:** Two tabs (ISBN Lookup & Manual Entry) with backdrop blur and scale-in animation.
-- **URL State Management:** Filters (status, language, genre, sort) survive page refreshes via `useSearchParams`.
-- **Skeleton Loaders:** Replaced spinners with layout-accurate pulse skeletons.
-- **Error Boundaries:** Sentry integration scaffolded.
+- **Tailwind CSS v4** with custom "Warm Minimalism" theme (Dark/Light mode).
+- **AuthContext:** JWT decoding (`jwt-decode`) and auto-logout on 401.
+- **Unified Add Book Modal:** 
+  - ISBN direct add.
+  - Multiselect Title/Author search with sticky action bar.
+  - Manual Entry fallback.
+- **Library Dashboard:**
+  - Bento Stats, Heatmap, Continue Reading Banner, Quote of the Day.
+  - URL State filtering & LocalStorage preferences.
+  - Group by Series (Accordion).
+  - Skeleton loaders.
+- **Animations:** Framer Motion (sliding pills, modal physics, hover states).
+- **Observability:** Sentry & PostHog initialized.
 
 ### 🚧 In Progress
-- Preparing for Day 4: Book Details Page (Reviews, Series, Where to Buy).
-
-### 📝 Next Up (Day 4)
-- Build the `/books/:id` route.
-- Display large cover, title, author, and series info.
-- Fetch and display public reviews + average rating.
-- Add "Where to Buy" (Amazon/Flipkart) search links.
-- Form to submit a new review.
+- Preparing for Day 5: Manual Series Creation, Discover & Recommendations Pages.
 
 ---
 
 ## 🏗️ Project Structure
+
+```text
+spine-ui/
+├── src/
+│   ├── api/                    # Axios client, library.ts, quotes.ts, types.ts
+│   ├── components/             # AddBookModal, BookCover, Sidebar, etc.
+│   ├── context/                # AuthContext, ThemeContext
+│   ├── pages/                  # Dashboard, Login, Register
+│   ├── App.tsx                 # Routing
+│   ├── main.tsx                # Providers + Sentry init
+│   └── index.css               # Tailwind theme
+├── .env.example
+├── vercel.json
+└── README.md
 
 ```text
 spine-ui/

@@ -1,4 +1,4 @@
-import { LayoutGrid, List, ChevronDown } from 'lucide-react';
+import { LayoutGrid, List, ChevronDown, Library } from 'lucide-react'; // Added Library icon
 import { motion } from 'framer-motion';
 import { cn } from '../lib/utils';
 
@@ -19,13 +19,15 @@ interface Props {
   setSelectedGenre: (genre: string) => void;
   sortBy: SortOption;
   setSortBy: (sort: SortOption) => void;
+  groupBySeries: boolean;
+  setGroupBySeries: (val: boolean) => void;
 }
 
 export function LibraryToolbar({
   viewMode, setViewMode, filterStatus, setFilterStatus,
   languages, selectedLanguage, setSelectedLanguage,
   genres, selectedGenre, setSelectedGenre,
-  sortBy, setSortBy,
+  sortBy, setSortBy, groupBySeries, setGroupBySeries,
 }: Props) {
   const statuses: FilterStatus[] = ['All', 'Reading', 'Finished', 'Unread'];
   const sortOptions: { value: SortOption; label: string }[] = [
@@ -39,7 +41,6 @@ export function LibraryToolbar({
     <div className="flex flex-col gap-4 mb-8">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         
-        {/* Sliding Pill Status Tabs */}
         <div className="flex items-center gap-1 overflow-x-auto pb-2 sm:pb-0 w-full sm:w-auto">
           {statuses.map((status) => (
             <button
@@ -62,32 +63,43 @@ export function LibraryToolbar({
           ))}
         </div>
 
-        {/* View Toggle */}
-        <div className="flex items-center bg-surface border border-border rounded-lg p-1 shadow-sm">
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            onClick={() => setViewMode('grid')}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setGroupBySeries(!groupBySeries)}
             className={cn(
-              'p-1.5 rounded-md transition-colors',
-              viewMode === 'grid' ? 'bg-bg text-primary shadow-sm' : 'text-text-muted hover:text-text'
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+              groupBySeries ? 'bg-primary/10 text-primary' : 'text-text-muted hover:bg-surface-hover'
             )}
           >
-            <LayoutGrid className="w-4 h-4" />
-          </motion.button>
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            onClick={() => setViewMode('list')}
-            className={cn(
-              'p-1.5 rounded-md transition-colors',
-              viewMode === 'list' ? 'bg-bg text-primary shadow-sm' : 'text-text-muted hover:text-text'
-            )}
-          >
-            <List className="w-4 h-4" />
-          </motion.button>
+            <Library className="w-4 h-4" />
+            Group by Series
+          </button>
+
+          <div className="flex items-center bg-surface border border-border rounded-lg p-1 shadow-sm">
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setViewMode('grid')}
+              className={cn(
+                'p-1.5 rounded-md transition-colors',
+                viewMode === 'grid' ? 'bg-bg text-primary shadow-sm' : 'text-text-muted hover:text-text'
+              )}
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </motion.button>
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setViewMode('list')}
+              className={cn(
+                'p-1.5 rounded-md transition-colors',
+                viewMode === 'list' ? 'bg-bg text-primary shadow-sm' : 'text-text-muted hover:text-text'
+              )}
+            >
+              <List className="w-4 h-4" />
+            </motion.button>
+          </div>
         </div>
       </div>
 
-      {/* Dropdown Filters */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative">
           <select

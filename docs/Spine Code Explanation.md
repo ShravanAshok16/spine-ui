@@ -2,7 +2,7 @@
 SPINE UI — COMPLETE LEARNING NOTES ON SOURCE CODE
 =====================================================================
 Author: Shravan Ashok
-Coverage: Sprint 7, Day 1 through Day 3
+Coverage: Sprint 7, Day 1 through Day 4
 =====================================================================
 
 
@@ -11,25 +11,29 @@ PART 1 — API & CONTEXTS
 =====================================================================
 
 --- src/api/client.ts ---
-  - Creates Axios instance with baseURL from import.meta.env.VITE_API_URL.
-  - Request interceptor: Reads 'spine_token' from localStorage, attaches Authorization header.
-  - Response interceptor:
-    - On 401: localStorage.removeItem('spine_token'); window.dispatchEvent(new Event('auth:unauthorized'));
-    - Normalizes errors: Checks for FluentValidation shape (data.errors) and joins messages. Falls back to data.error or data.message.
+  - Axios instance with baseURL from VITE_API_URL.
+  - Request interceptor: attaches 'spine_token'.
+  - Response interceptor: 
+    - On 401: clears token, dispatches 'auth:unauthorized'.
+    - Normalizes errors: Checks for FluentValidation shape (data.errors) and joins messages.
 
 --- src/context/AuthContext.tsx ---
-  - Holds token and user state.
-  - useEffect: Decodes token using jwt-decode. Extracts `sub` (id), `email`, and `DisplayName` claim.
+  - useEffect decodes token using jwt-decode. Extracts `sub`, `email`, and `DisplayName`.
   - login(token): Saves to localStorage and state.
   - logout(): Clears localStorage and state.
-  - useEffect: Listens for 'auth:unauthorized' event to trigger logout.
+  - Listens for 'auth:unauthorized' event.
 
 --- src/context/ThemeContext.tsx ---
-  - Initializes theme from localStorage ('spine_theme') or prefers-color-scheme.
-  - useEffect: Toggles `.dark` class on document.documentElement and saves to localStorage.
+  - Reads 'spine_theme' from localStorage or prefers-color-scheme.
+  - Toggles `.dark` class on document.documentElement.
+
+--- src/api/library.ts ---
+  - getMyLibrary(): GET /api/UserBooks.
+  - searchExternalBooks(query): GET /api/Books/search.
+  - deleteUserBook(id): DELETE /api/UserBooks/{id}.
 
 --- src/api/quotes.ts ---
-  - getRandomQuote(): GET /api/Quotes/random. Returns null on 204 No Content.
+  - getDailyQuote(): GET /api/Quotes/daily.
 
 
 =====================================================================
@@ -37,34 +41,36 @@ PART 2 — DASHBOARD & FILTERS
 =====================================================================
 
 --- src/pages/Dashboard.tsx ---
-  - Uses useSearchParams to read filter state from URL (search, view, status, sort, lang, genre).
+  - Uses useSearchParams to read filter state (search, view, status, sort, lang, genre).
   - updateParam(key, value): Updates URL params and saves 'view'/'sort' to localStorage.
   - useQuery: Fetches library with queryKey ['library'].
   - readingBooks: Memoized filter for status === 'Reading'.
-  - continueReadingBook: The first book in readingBooks (for the banner).
+  - continueReadingBook: readingBooks[0] (for the banner).
   - otherReadingBooks: readingBooks.slice(1) (for the row).
-  - filteredBooks: Applies search, status, language, genre, and sort.
+  - groupedBooks: useMemo that reduces filteredBooks into a Record<string, UserBook[]> keyed by seriesName (or 'Standalone Books').
   - Rendering:
-    - isLoading: Renders skeleton loaders (Banner, Stats, Heatmap, Grid).
-    - Empty: Renders <EmptyLibrary />.
-    - Data: Renders <ContinueReadingBanner />, <ContinueReadingRow />, <StatsRow />, <QuoteCard />, <ReadingHeatmap />, <LibraryToolbar />, and the Grid/List.
+    - isLoading: Skeleton loaders.
+    - books.length === 0: <EmptyLibrary />.
+    - groupBySeries: Maps over groupedBooks, renders <SeriesGroup /> for series and a flat grid for standalone.
+    - Else: <BookCover /> grid or <BookListItem /> list.
 
 --- src/components/LibraryToolbar.tsx ---
-  - Status tabs: Uses Framer Motion layoutId="active-pill" so the background slides between "All", "Reading", etc.
+  - Status tabs: Uses Framer Motion layoutId="active-pill" so the background slides between filters.
+  - Group by Series button: Toggles the view mode.
   - View toggle: Grid vs List with whileTap.
   - Dropdowns: Language, Genre, Sort.
 
 --- src/components/BookCover.tsx ---
   - aspect-[2/3] container.
-  - Fallback: If !coverUrl or imageError or naturalWidth < 10, renders a gradient (chosen by title hash) with Title, Author, and "Spine".
-  - Status badge (Unread, Reading, Finished, DNF).
-  - Genre chip (first genre).
-  - Progress bar for "Reading" books.
-  - Uses Framer Motion whileHover={{ y: -5 }}.
+  - Fallback: Renders a gradient (based on title hash) if no cover.
+  - Status badge + Genre chip.
+  - Delete button: Visible on hover, calls useMutation(deleteUserBook).
+  - Framer Motion whileHover={{ y: -5 }}.
 
---- src/components/BookListItem.tsx ---
-  - Horizontal layout for list view.
-  - Uses the same gradient fallback logic but scaled down.
+--- src/components/SeriesGroup.tsx ---
+  - Framer Motion accordion.
+  - initial={{ height: 0 }} animate={{ height: 'auto' }} when expanded.
+  - Renders a grid of BookCover inside the accordion body.
 
 
 =====================================================================
@@ -72,18 +78,18 @@ PART 3 — MODALS & ANIMATIONS
 =====================================================================
 
 --- src/components/AddBookModal.tsx ---
-  - Framer Motion: AnimatePresence wraps the modal.
-  - Backdrop: initial={{ opacity: 0 }} animate={{ opacity: 1 }}.
-  - Modal: initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}.
-  - Tabs: 'isbn' and 'manual'.
-  - handleIsbnSubmit: POST /api/UserBooks. Invalidates ['library'] query on success.
-  - handleManualSubmit: POST /api/UserBooks/manual. Invalidates ['library'] query on success.
+  - Framer Motion: AnimatePresence wraps the modal and sticky bar.
+  - Multiselect: `selectedIds` Set tracks clicked books.
+  - handleSearch: Regex checks for ISBN. If text, calls searchExternalBooks.
+  - handleAddIsbnDirectly: POST /api/UserBooks.
+  - handleAddSelected: Promise.all of POST /api/UserBooks/manual, passing seriesName and seriesPosition.
+  - handleManualSubmit: POST /api/UserBooks/manual with all fields.
+  - Sticky Bar: initial={{ y: 100 }} animate={{ y: 0 }} slides up when books are selected.
 
 --- src/components/Sidebar.tsx ---
   - Collapsible (isCollapsed state).
   - Logout uses navigate('/login', { replace: true }).
-  - User profile: Renders user.displayName and user.email.
-  - Fixed layout: h-screen, sticky, mt-auto for logout.
+  - User profile: Renders user.displayName, user.email, and the first letter of displayName as an avatar.
 
 --- src/components/ContinueReadingBanner.tsx ---
   - Large hero for the most recent "Reading" book.
@@ -95,8 +101,7 @@ PART 3 — MODALS & ANIMATIONS
 
 --- src/components/QuoteCard.tsx ---
   - useQuery with staleTime of 24h.
-  - Returns null if no quote exists.
-  - Renders text, book title, and page number.
+  - Renders quote.text and quote.author.
 
 --- src/components/ReadingHeatmap.tsx ---
   - 5-week grid (35 days).
@@ -104,7 +109,6 @@ PART 3 — MODALS & ANIMATIONS
 
 --- src/components/StatsRow.tsx ---
   - Total Books, Reading, Finished, Avg Pages.
-  - Avg Pages: Math.round(total pages / books with pages).
 
 =====================================================================
 END OF NOTES

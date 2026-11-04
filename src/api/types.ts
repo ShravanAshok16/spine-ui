@@ -14,6 +14,8 @@ export interface UserBook {
   lentTo: string | null;
   addedAt: string;
   readingSessionCount?: number;
+  seriesId: string | null;
+  seriesName: string | null;
 }
 
 export interface Quote {
@@ -21,4 +23,17 @@ export interface Quote {
   pageNumber: number;
   bookTitle: string;
   author: string;
+}
+
+export interface BookSearchResult {
+  isbn: string | null;
+  title: string;
+  author: string;
+  coverUrl: string | null;
+  description: string | null;
+  pageCount: number | null;
+  genres: string | null;
+  language: string | null;
+  seriesName: string | null;   
+  seriesPosition: number | null; 
 }

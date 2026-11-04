@@ -9,19 +9,21 @@ import { BookListItem } from '../components/BookListItem';
 import { StatsRow } from '../components/StatsRow';
 import { EmptyLibrary } from '../components/EmptyLibrary';
 import { ContinueReadingBanner } from '../components/ContinueReadingBanner';
-import { ContinueReadingRow } from '../components/ContinueReadingRow'; // NEW
-import { QuoteCard } from '../components/QuoteCard'; // NEW
+import { ContinueReadingRow } from '../components/ContinueReadingRow';
+import { QuoteCard } from '../components/QuoteCard';
 import { ReadingHeatmap } from '../components/ReadingHeatmap';
 import { LibraryToolbar, type ViewMode, type FilterStatus, type SortOption } from '../components/LibraryToolbar';
 import { AddBookModal } from '../components/AddBookModal';
+import { SeriesGroup } from '../components/SeriesGroup'; // 🔥 NEW
 import ThemeToggle from '../components/ThemeToggle';
 import { Sidebar } from '../components/Sidebar';
+import type { UserBook } from '../api/types'; // 🔥 NEW
 
 export default function Dashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [groupBySeries, setGroupBySeries] = useState(false); // 🔥 NEW
 
-  // 🔥 Read from URL, fallback to localStorage defaults, then hardcoded defaults
   const defaultView = (localStorage.getItem('spine_view') as ViewMode) || 'grid';
   const defaultSort = (localStorage.getItem('spine_sort') as SortOption) || 'newest';
 
@@ -32,13 +34,10 @@ export default function Dashboard() {
   const selectedLanguage = searchParams.get('lang') || 'All';
   const selectedGenre = searchParams.get('genre') || 'All';
 
-  // Update URL + Save to LocalStorage
   const updateParam = (key: string, value: string) => {
     const newParams = new URLSearchParams(searchParams);
-    
     if (key === 'view') localStorage.setItem('spine_view', value);
     if (key === 'sort') localStorage.setItem('spine_sort', value);
-
     if (value === 'All' || value === '' || (key === 'view' && value === 'grid')) {
       newParams.delete(key);
     } else {
@@ -52,17 +51,11 @@ export default function Dashboard() {
     queryFn: () => getMyLibrary(),
   });
 
-  // All books currently being read
   const readingBooks = useMemo(() => {
-    return books
-      .filter((b) => b.status === 'Reading')
-      .sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
+    return books.filter((b) => b.status === 'Reading').sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
   }, [books]);
 
-  // The single most recent book for the banner
   const continueReadingBook = readingBooks.length > 0 ? readingBooks[0] : null;
-  
-  // 🔥 The REMAINING books for the row (excluding the one in the banner)
   const otherReadingBooks = readingBooks.slice(1);
 
   const readingActivity = useMemo(() => {
@@ -113,6 +106,28 @@ export default function Dashboard() {
     return result;
   }, [books, search, filterStatus, selectedLanguage, selectedGenre, sortBy]);
 
+  // 🔥 GROUPING LOGIC
+  const groupedBooks = useMemo(() => {
+    const groups: Record<string, UserBook[]> = {};
+    
+    filteredBooks.forEach((book) => {
+      // Normalize the series name (e.g., "the stormlight archive series" -> "stormlight archive")
+      let key = book.seriesName 
+        ? book.seriesName.replace(/the\s+/i, '').replace(/\s+series/i, '').trim()
+        : 'Standalone Books';
+
+      // Capitalize for display
+      if (key !== 'Standalone Books') {
+        key = key.replace(/\b\w/g, l => l.toUpperCase());
+      }
+
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(book);
+    });
+    
+    return groups;
+  }, [filteredBooks]);
+
   return (
     <div className="h-screen overflow-hidden flex bg-bg">
       <div className="flex-shrink-0 hidden md:block">
@@ -144,83 +159,84 @@ export default function Dashboard() {
           </div>
         </header>
 
-                <div className="flex-1 overflow-y-auto p-6 md:p-8">
+        <div className="flex-1 overflow-y-auto p-6 md:p-8">
           {isLoading ? (
-            /* 🔥 SKELETON LOADERS */
             <div className="animate-pulse space-y-8">
-              
-              {/* Banner Skeleton */}
               <div className="h-44 bg-surface rounded-2xl border border-border w-full"></div>
-
-              {/* Stats Skeleton */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="h-24 bg-surface rounded-xl border border-border"></div>
-                ))}
+                {[1, 2, 3, 4].map((i) => <div key={i} className="h-24 bg-surface rounded-xl border border-border"></div>)}
               </div>
-
-              {/* Heatmap Skeleton */}
               <div className="h-40 bg-surface rounded-xl border border-border w-full"></div>
-
-              {/* Toolbar Skeleton */}
-              <div className="h-12 bg-surface rounded-xl border border-border w-full max-w-md"></div>
-
-              {/* Grid Skeleton */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
-                  <div key={i} className="flex flex-col gap-3">
-                    <div className="aspect-[2/3] bg-surface rounded-lg border border-border w-full"></div>
-                    <div className="h-4 bg-surface rounded w-3/4"></div>
-                    <div className="h-3 bg-surface rounded w-1/2"></div>
-                  </div>
-                ))}
-              </div>
-
             </div>
           ) : isError ? (
             <div className="text-center py-20 text-red-500">Failed to load library.</div>
-          ) : books.length === 0 ? (
-            <EmptyLibrary onAddClick={() => setIsModalOpen(true)} />
           ) : (
             <>
               {continueReadingBook && (
                 <ContinueReadingBanner book={continueReadingBook} onLogProgress={() => {}} />
               )}
               
-              {/* 🔥 Only show the row if there are OTHER books being read */}
               {otherReadingBooks.length > 0 && (
                 <ContinueReadingRow books={otherReadingBooks} />
               )}
 
-              {/* 3. Stats Bento Grid (Now with Avg Pages) */}
               <StatsRow books={books} onReadingClick={() => updateParam('status', 'Reading')} />
 
-              {/* 4. Quote of the Day */}
               <QuoteCard />
 
-              {/* 5. Reading Heatmap */}
-              <ReadingHeatmap activity={readingActivity} />
+              {books.length > 0 && (
+                <ReadingHeatmap activity={readingActivity} />
+              )}
               
-              {/* 6. Filters */}
-              <LibraryToolbar
-                viewMode={viewMode}
-                setViewMode={(v) => updateParam('view', v)}
-                filterStatus={filterStatus}
-                setFilterStatus={(s) => updateParam('status', s)}
-                languages={uniqueLanguages}
-                selectedLanguage={selectedLanguage}
-                setSelectedLanguage={(l) => updateParam('lang', l)}
-                genres={uniqueGenres}
-                selectedGenre={selectedGenre}
-                setSelectedGenre={(g) => updateParam('genre', g)}
-                sortBy={sortBy}
-                setSortBy={(s) => updateParam('sort', s)}
-              />
+              {books.length > 0 && (
+                <LibraryToolbar
+                  viewMode={viewMode}
+                  setViewMode={(v) => updateParam('view', v)}
+                  filterStatus={filterStatus}
+                  setFilterStatus={(s) => updateParam('status', s)}
+                  languages={uniqueLanguages}
+                  selectedLanguage={selectedLanguage}
+                  setSelectedLanguage={(l) => updateParam('lang', l)}
+                  genres={uniqueGenres}
+                  selectedGenre={selectedGenre}
+                  setSelectedGenre={(g) => updateParam('genre', g)}
+                  sortBy={sortBy}
+                  setSortBy={(s) => updateParam('sort', s)}
+                  groupBySeries={groupBySeries}
+                  setGroupBySeries={setGroupBySeries}
+                />
+              )}
               
-              {/* 7. Library Grid/List */}
-              {filteredBooks.length === 0 ? (
+              {books.length === 0 ? (
+                <EmptyLibrary onAddClick={() => setIsModalOpen(true)} />
+              ) : filteredBooks.length === 0 ? (
                 <div className="text-center py-20 text-text-muted bg-surface/50 border border-border rounded-xl">
                   No books found matching your criteria.
+                </div>
+              ) : groupBySeries ? (
+                /* 🔥 GROUPED VIEW */
+                <div className="flex flex-col gap-6 pb-12">
+                  {Object.entries(groupedBooks).map(([seriesName, booksInSeries]) => {
+                    if (seriesName === 'Standalone Books') {
+                      return (
+                        <div key={seriesName} className="mt-8">
+                          <h3 className="text-xl font-serif font-bold mb-4 border-b border-border pb-2">Standalone Books</h3>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                            {booksInSeries.map((book, i) => (
+                              <BookCover key={book.id} book={book} index={i} />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return (
+                      <SeriesGroup 
+                        key={seriesName} 
+                        seriesName={seriesName} 
+                        books={booksInSeries} 
+                      />
+                    );
+                  })}
                 </div>
               ) : viewMode === 'grid' ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 pb-12">

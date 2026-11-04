@@ -1,8 +1,11 @@
 import { apiClient } from './client';
-import type { Quote } from './types';
 
-export async function getRandomQuote(): Promise<Quote | null> {
-  const { data, status } = await apiClient.get<Quote>('/api/Quotes/random');
-  if (status === 204) return null;
+export interface DailyQuote {
+  text: string;
+  author: string;
+}
+
+export async function getDailyQuote(): Promise<DailyQuote | null> {
+  const { data } = await apiClient.get<DailyQuote>('/api/Quotes/daily');
   return data;
 }
