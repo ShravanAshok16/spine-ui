@@ -1,114 +1,95 @@
 =====================================================================
-SPINE UI — COMPLETE LEARNING NOTES ON SOURCE CODE
+SPINE UI — COMPLETE CODE EXPLANATION
 =====================================================================
-Author: Shravan Ashok
-Coverage: Sprint 7, Day 1 through Day 4
+Coverage: Sprint 7, Day 1 through Day 5
 =====================================================================
-
 
 =====================================================================
 PART 1 — API & CONTEXTS
 =====================================================================
 
 --- src/api/client.ts ---
-  - Axios instance with baseURL from VITE_API_URL.
-  - Request interceptor: attaches 'spine_token'.
-  - Response interceptor: 
-    - On 401: clears token, dispatches 'auth:unauthorized'.
-    - Normalizes errors: Checks for FluentValidation shape (data.errors) and joins messages.
+  - Axios instance with baseURL from `import.meta.env.VITE_API_URL`.
+  - Request interceptor: Reads 'spine_token' from localStorage, attaches `Authorization: Bearer`.
+  - Response interceptor:
+    - On 401: Removes token and dispatches `auth:unauthorized`.
+    - Normalizes errors: Checks for FluentValidation shape (`data.errors`) and joins messages. Falls back to `data.error` or `data.message`.
 
 --- src/context/AuthContext.tsx ---
-  - useEffect decodes token using jwt-decode. Extracts `sub`, `email`, and `DisplayName`.
-  - login(token): Saves to localStorage and state.
-  - logout(): Clears localStorage and state.
-  - Listens for 'auth:unauthorized' event.
+  - Holds `token` and `user` state.
+  - `useEffect`: Decodes token using `jwt-decode`. Extracts `sub` (id), `email`, `FirstName`, `LastName`.
+  - `login(token)`: Saves to localStorage and state.
+  - `logout()`: Clears localStorage and state.
+  - Listens for 'auth:unauthorized' event to trigger logout.
 
 --- src/context/ThemeContext.tsx ---
-  - Reads 'spine_theme' from localStorage or prefers-color-scheme.
-  - Toggles `.dark` class on document.documentElement.
+  - Initializes theme from localStorage ('spine_theme') or `prefers-color-scheme`.
+  - `useEffect`: Toggles `.dark` class on `document.documentElement` and saves to localStorage.
 
 --- src/api/library.ts ---
-  - getMyLibrary(): GET /api/UserBooks.
-  - searchExternalBooks(query): GET /api/Books/search.
-  - deleteUserBook(id): DELETE /api/UserBooks/{id}.
+  - `getMyLibrary()`: GET `/api/UserBooks`.
+  - `searchExternalBooks(query)`: GET `/api/Books/search?q=`.
+  - `deleteUserBook(id)`: DELETE `/api/UserBooks/{id}`.
+  - `batchDeleteBooks(ids)`: POST `/api/UserBooks/batch-delete`.
+  - `toggleFavourite(id)`: PATCH `/api/UserBooks/{id}/favourite`.
+  - `updateProgress(id, page)`: PATCH `/api/UserBooks/{id}/progress`.
+  - `linkSeries(seriesName, bookIds)`: POST `/api/UserBooks/link-series`.
 
 --- src/api/quotes.ts ---
-  - getDailyQuote(): GET /api/Quotes/daily.
-
+  - `getDailyQuote()`: GET `/api/Quotes/daily`.
 
 =====================================================================
-PART 2 — DASHBOARD & FILTERS
+PART 2 — DASHBOARD & LIBRARY
 =====================================================================
 
 --- src/pages/Dashboard.tsx ---
-  - Uses useSearchParams to read filter state (search, view, status, sort, lang, genre).
-  - updateParam(key, value): Updates URL params and saves 'view'/'sort' to localStorage.
-  - useQuery: Fetches library with queryKey ['library'].
-  - readingBooks: Memoized filter for status === 'Reading'.
-  - continueReadingBook: readingBooks[0] (for the banner).
-  - otherReadingBooks: readingBooks.slice(1) (for the row).
-  - groupedBooks: useMemo that reduces filteredBooks into a Record<string, UserBook[]> keyed by seriesName (or 'Standalone Books').
-  - Rendering:
-    - isLoading: Skeleton loaders.
-    - books.length === 0: <EmptyLibrary />.
-    - groupBySeries: Maps over groupedBooks, renders <SeriesGroup /> for series and a flat grid for standalone.
-    - Else: <BookCover /> grid or <BookListItem /> list.
+  - **Purpose:** The "Morning Coffee" view.
+  - `useSearchParams` manages URL state.
+  - `greeting`: Calculates "Good morning/evening" based on `new Date().getHours()`. Formats `user.lastName, user.firstName`.
+  - `useQuery`: Fetches library with queryKey `['library']`.
+  - `readingBooks`: Memoized filter for `status === 'Reading'`.
+  - `booksFinishedThisYear`: Dynamic calculation for the Yearly Goal card.
+  - `favouriteBooks`: Filters `books.filter(b => b.isFavourite)`.
+  - **Renders:** Bento grid with Continue Reading banner (or empty state), Stats Row, Quote Card, Yearly Goal card, Favourites carousel, and Heatmap.
+
+--- src/pages/Library.tsx ---
+  - **Purpose:** The "Vault" for heavy management.
+  - `selectedBooks`: A `Set<string>` for Batch Selection.
+  - `handleBatchDelete`: Calls `batchDeleteBooks`, then invalidates `['library']` and clears the set.
+  - **Renders:** `LibraryToolbar`, Grid/List view, SeriesGroup accordions.
+  - **Sticky Action Bar:** If `selectedBooks.size > 0`, renders a fixed bottom bar with a "Delete Selected" button.
 
 --- src/components/LibraryToolbar.tsx ---
-  - Status tabs: Uses Framer Motion layoutId="active-pill" so the background slides between filters.
-  - Group by Series button: Toggles the view mode.
-  - View toggle: Grid vs List with whileTap.
-  - Dropdowns: Language, Genre, Sort.
-
---- src/components/BookCover.tsx ---
-  - aspect-[2/3] container.
-  - Fallback: Renders a gradient (based on title hash) if no cover.
-  - Status badge + Genre chip.
-  - Delete button: Visible on hover, calls useMutation(deleteUserBook).
-  - Framer Motion whileHover={{ y: -5 }}.
-
---- src/components/SeriesGroup.tsx ---
-  - Framer Motion accordion.
-  - initial={{ height: 0 }} animate={{ height: 'auto' }} when expanded.
-  - Renders a grid of BookCover inside the accordion body.
-
+  - **Status Tabs:** Uses Framer Motion `layoutId="active-pill"` for the sliding background.
+  - **View Toggle:** Grid vs List with `whileTap`.
+  - **Filters:** Language, Genre, Sort.
 
 =====================================================================
 PART 3 — MODALS & ANIMATIONS
 =====================================================================
 
 --- src/components/AddBookModal.tsx ---
-  - Framer Motion: AnimatePresence wraps the modal and sticky bar.
-  - Multiselect: `selectedIds` Set tracks clicked books.
-  - handleSearch: Regex checks for ISBN. If text, calls searchExternalBooks.
-  - handleAddIsbnDirectly: POST /api/UserBooks.
-  - handleAddSelected: Promise.all of POST /api/UserBooks/manual, passing seriesName and seriesPosition.
-  - handleManualSubmit: POST /api/UserBooks/manual with all fields.
-  - Sticky Bar: initial={{ y: 100 }} animate={{ y: 0 }} slides up when books are selected.
+  - **Framer Motion:** `AnimatePresence` wraps the modal.
+  - **Multiselect:** `selectedIds` Set tracks clicked books. Clicking a cover adds a checkmark overlay.
+  - **Sticky Bar:** `initial={{ y: 100 }}` animates up when `selectedIds.size > 0`.
+  - **handleSearch:** Regex checks for ISBN. If text, calls `searchExternalBooks`.
+  - **handleAddSelected:** `Promise.all` of POST requests to `/api/UserBooks/manual`.
 
---- src/components/Sidebar.tsx ---
-  - Collapsible (isCollapsed state).
-  - Logout uses navigate('/login', { replace: true }).
-  - User profile: Renders user.displayName, user.email, and the first letter of displayName as an avatar.
+--- src/components/UpdateProgressModal.tsx ---
+  - **Optimistic Update:** Uses `useMutation` with `onMutate`.
+  - Cancels outgoing queries, snapshots the previous state, updates the UI instantly with the new page count, then sends the API request.
+  - `onError` rolls back to the snapshot if the API fails.
 
---- src/components/ContinueReadingBanner.tsx ---
-  - Large hero for the most recent "Reading" book.
-  - Progress bar: (currentPage / totalPages) * 100.
+--- src/components/BookCover.tsx ---
+  - **aspect-[2/3]** container.
+  - **Fallback Logic:** `showFallback = !book.coverUrl || imageError`. If true, renders a gradient based on the title's char code.
+  - **1x1 Pixel Fix:** `handleImageLoad` checks `e.currentTarget.naturalWidth < 10`.
+  - **Status Badges:** `statusStyles` maps `status` to color classes.
+  - **Delete Button:** Visible on hover, triggers `useMutation(deleteUserBook)`.
 
---- src/components/ContinueReadingRow.tsx ---
-  - Horizontal scroller (overflow-x-auto snap-x).
-  - Renders small cards with progress bars.
-
---- src/components/QuoteCard.tsx ---
-  - useQuery with staleTime of 24h.
-  - Renders quote.text and quote.author.
-
---- src/components/ReadingHeatmap.tsx ---
-  - 5-week grid (35 days).
-  - Maps activity intensity (0-4) to bg-primary opacity levels.
-
---- src/components/StatsRow.tsx ---
-  - Total Books, Reading, Finished, Avg Pages.
+--- src/components/SeriesGroup.tsx ---
+  - **Chevron Rotate:** `animate={{ rotate: isOpen ? 90 : 0 }}`.
+  - **Height Animation:** `AnimatePresence` with `initial={{ height: 0 }}`.
 
 =====================================================================
 END OF NOTES

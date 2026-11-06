@@ -1,10 +1,14 @@
+export type OwnershipStatus = 'Owned' | 'Wishlist' | 'LentOut' | 'Sold' | 'Donated' | 'Lost';
+
 export interface UserBook {
   id: string;
   bookId: string;
   title: string;
   author: string;
   coverUrl: string | null;
-  status: 'Unread' | 'Reading' | 'Finished' | 'DNF';
+  status: 'Unread' | 'Reading' | 'Paused' | 'Finished' | 'DNF';
+  ownership: OwnershipStatus;
+  isFavourite: boolean;
   currentPage: number;
   totalPages: number | null;
   language: string | null;
@@ -13,7 +17,6 @@ export interface UserBook {
   privateNotes: string | null;
   lentTo: string | null;
   addedAt: string;
-  readingSessionCount?: number;
   seriesId: string | null;
   seriesName: string | null;
 }

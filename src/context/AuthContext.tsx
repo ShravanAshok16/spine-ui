@@ -3,7 +3,7 @@ import { jwtDecode } from 'jwt-decode'; // 🔥 npm install jwt-decode
 
 interface AuthContextType {
   token: string | null;
-  user: { id: string; email: string; displayName: string } | null;
+  user: { id: string; email: string; displayName: string; firstName: string; lastName: string } | null;
   login: (token: string) => void;
   logout: () => void;
 }
@@ -19,10 +19,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (token) {
       try {
         const decoded: any = jwtDecode(token);
+        console.log("Decoded Token:", decoded)
         setUser({
           id: decoded.sub,
           email: decoded.email,
           displayName: decoded.DisplayName || decoded.email.split('@')[0], // fallback to email prefix
+          firstName: decoded.FirstName || "",
+          lastName: decoded.LastName || "",
         });
       } catch (e) {
         console.error("Invalid token", e);

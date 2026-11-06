@@ -2,7 +2,7 @@
 
 A production-grade, responsive React frontend for tracking physical book collections, reading progress, and sharing libraries with friends.
 
-🌐 **Live App:** *(Coming in Sprint 7)*  
+🌐 **Live App:** *(Coming in Sprint 7)*
 🔌 **Backend Repo:** [ShravanAshok16/Spine](https://github.com/ShravanAshok16/Spine)
 
 ---
@@ -10,26 +10,22 @@ A production-grade, responsive React frontend for tracking physical book collect
 ## 📌 Current Status
 
 **Phase:** Sprint 7 — Web Frontend Core
-**Progress:** `[█████░░░░░] 50%`
+**Progress:** `[██████░░░░] 60%`
 
 ### ✅ Done
 - **Vite + React 19 + TypeScript** foundation.
-- **Tailwind CSS v4** with custom "Warm Minimalism" theme (Dark/Light mode).
-- **AuthContext:** JWT decoding (`jwt-decode`) and auto-logout on 401.
-- **Unified Add Book Modal:** 
-  - ISBN direct add.
-  - Multiselect Title/Author search with sticky action bar.
-  - Manual Entry fallback.
-- **Library Dashboard:**
-  - Bento Stats, Heatmap, Continue Reading Banner, Quote of the Day.
-  - URL State filtering & LocalStorage preferences.
-  - Group by Series (Accordion).
-  - Skeleton loaders.
-- **Animations:** Framer Motion (sliding pills, modal physics, hover states).
-- **Observability:** Sentry & PostHog initialized.
+- **Tailwind CSS v4** with custom "Warm Minimalism" theme.
+- **Global State:** AuthContext (JWT decoding), ThemeContext (Day/Night toggle with physics).
+- **The Two-Mode Architecture:**
+  - `/dashboard`: The "Morning Coffee" view (Greeting, Stats, Favourites Carousel, Quote, Heatmap).
+  - `/library`: The "Vault" (Heavy filtering, Series Grouping, Batch Delete, Create Series).
+- **Unified Add Book Modal:** ISBN instant-add, Multiselect Title/Author search, Manual fallback.
+- **Optimistic UI:** Instant UI updates for favouriting, updating progress, and changing statuses.
+- **Granular Tracking:** Ownership statuses (Owned, Wishlist, LentOut, Sold, etc.), Paused reading status, and Favourites.
+- **Advanced UI Components:** Framer Motion sliding pills, Jelly Icons, Animated Modals, and Skeleton Loaders.
 
 ### 🚧 In Progress
-- Preparing for Day 5: Manual Series Creation, Discover & Recommendations Pages.
+- Preparing for Day 6: Discover & Recommendations Pages.
 
 ---
 
@@ -38,18 +34,18 @@ A production-grade, responsive React frontend for tracking physical book collect
 ```text
 spine-ui/
 ├── src/
-│   ├── api/                    # Axios client, library.ts, quotes.ts, types.ts
-│   ├── components/             # AddBookModal, BookCover, Sidebar, etc.
-│   ├── context/                # AuthContext, ThemeContext
-│   ├── pages/                  # Dashboard, Login, Register
-│   ├── App.tsx                 # Routing
-│   ├── main.tsx                # Providers + Sentry init
-│   └── index.css               # Tailwind theme
-├── .env.example
+│ ├── api/ # Axios client, library.ts, quotes.ts, types.ts
+│ ├── components/ # AddBookModal, BookCover, Sidebar, UpdateProgressModal, etc.
+│ ├── context/ # AuthContext, ThemeContext
+│ ├── pages/ # Dashboard, Library, Login, Register
+│ ├── App.tsx # Routing (Protected routes)
+│ ├── main.tsx # Providers + Sentry init
+│ └── index.css # Tailwind theme
+├──.env.example
 ├── vercel.json
 └── README.md
 
-```text
+
 spine-ui/
 ├── src/
 │   ├── api/                    # HTTP layer

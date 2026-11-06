@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { BookOpen, Users, Settings, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BookOpen, Users, Settings, LogOut, ChevronLeft, ChevronRight, Home } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { SpineLogo } from './SpineLogo';
@@ -18,7 +18,8 @@ export function Sidebar() {
   };
 
   const navItems = [
-    { label: 'My Library', icon: BookOpen, path: '/dashboard' },
+    { label: 'Dashboard', icon: Home, path: '/dashboard' },
+    { label: 'My Library', icon: BookOpen, path: '/library' }, // 🔥 Added this
     { label: 'Friends', icon: Users, path: '/friends' },
     { label: 'Settings', icon: Settings, path: '/settings' },
   ];
@@ -61,14 +62,21 @@ export function Sidebar() {
               to={item.path}
               title={isCollapsed ? item.label : undefined}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors relative group",
                 isActive 
                   ? "bg-primary/10 text-primary font-medium" 
                   : "text-text-muted hover:bg-bg hover:text-text",
                 isCollapsed && "justify-center"
               )}
             >
-              <Icon className="w-5 h-5 flex-shrink-0" />
+              {/* 🔥 Jelly Icon Animation */}
+              <motion.div
+                animate={isActive ? { scaleY: [1, 0.8, 1.1, 1], scaleX: [1, 1.1, 0.9, 1] } : {}}
+                transition={{ duration: 0.3 }}
+              >
+                <Icon className="w-5 h-5 flex-shrink-0" />
+              </motion.div>
+              
               {!isCollapsed && <span className="truncate">{item.label}</span>}
             </Link>
           );

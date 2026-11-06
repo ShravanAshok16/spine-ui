@@ -1,9 +1,9 @@
-import { LayoutGrid, List, ChevronDown, Library } from 'lucide-react'; // Added Library icon
+import { LayoutGrid, List, ChevronDown, Library } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '../lib/utils';
 
 export type ViewMode = 'grid' | 'list';
-export type FilterStatus = 'All' | 'Reading' | 'Finished' | 'Unread';
+export type FilterStatus = 'All' | 'Reading' | 'Paused' | 'Finished' | 'Unread' | 'DNF';
 export type SortOption = 'newest' | 'title' | 'author' | 'rating';
 
 interface Props {
@@ -21,6 +21,7 @@ interface Props {
   setSortBy: (sort: SortOption) => void;
   groupBySeries: boolean;
   setGroupBySeries: (val: boolean) => void;
+  onCreateSeries?: () => void; // 🔥 Added this
 }
 
 export function LibraryToolbar({
@@ -28,8 +29,9 @@ export function LibraryToolbar({
   languages, selectedLanguage, setSelectedLanguage,
   genres, selectedGenre, setSelectedGenre,
   sortBy, setSortBy, groupBySeries, setGroupBySeries,
+  onCreateSeries
 }: Props) {
-  const statuses: FilterStatus[] = ['All', 'Reading', 'Finished', 'Unread'];
+  const statuses: FilterStatus[] = ['All', 'Reading', 'Paused', 'Finished', 'Unread', 'DNF'];
   const sortOptions: { value: SortOption; label: string }[] = [
     { value: 'newest', label: 'Newest First' },
     { value: 'title', label: 'Title (A-Z)' },
@@ -38,10 +40,13 @@ export function LibraryToolbar({
   ];
 
   return (
-    <div className="flex flex-col gap-4 mb-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+    <div className="flex flex-col gap-4 mb-6 w-full">
+      
+      {/* Row 1: Status Pills & View Controls */}
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         
-        <div className="flex items-center gap-1 overflow-x-auto pb-2 sm:pb-0 w-full sm:w-auto">
+        {/* Status Pills */}
+        <div className="flex items-center gap-1 overflow-x-auto overflow-y-hidden pb-2 lg:pb-0 w-full lg:w-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {statuses.map((status) => (
             <button
               key={status}
@@ -63,12 +68,14 @@ export function LibraryToolbar({
           ))}
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Right side controls (Group, Grid/List, Create) */}
+        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+          
           <button
             onClick={() => setGroupBySeries(!groupBySeries)}
             className={cn(
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-              groupBySeries ? 'bg-primary/10 text-primary' : 'text-text-muted hover:bg-surface-hover'
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border border-transparent',
+              groupBySeries ? 'bg-primary/10 text-primary border-primary/20' : 'text-text-muted hover:bg-surface border-border'
             )}
           >
             <Library className="w-4 h-4" />
@@ -97,10 +104,20 @@ export function LibraryToolbar({
               <List className="w-4 h-4" />
             </motion.button>
           </div>
+
+          {onCreateSeries && (
+            <button
+              onClick={onCreateSeries}
+              className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-hover transition-colors shadow-sm"
+            >
+              + Create Series
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      {/* Row 2: Dropdown Filters */}
+      <div className="flex flex-wrap items-center gap-3 border-t border-border/50 pt-4">
         <div className="relative">
           <select
             value={selectedLanguage}

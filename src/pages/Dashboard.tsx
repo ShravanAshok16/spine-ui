@@ -1,52 +1,26 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Search } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { Plus, ArrowRight, BookOpen, Flame } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getMyLibrary } from '../api/library';
-import { BookCover } from '../components/BookCover';
-import { BookListItem } from '../components/BookListItem';
 import { StatsRow } from '../components/StatsRow';
-import { EmptyLibrary } from '../components/EmptyLibrary';
 import { ContinueReadingBanner } from '../components/ContinueReadingBanner';
-import { ContinueReadingRow } from '../components/ContinueReadingRow';
 import { QuoteCard } from '../components/QuoteCard';
 import { ReadingHeatmap } from '../components/ReadingHeatmap';
-import { LibraryToolbar, type ViewMode, type FilterStatus, type SortOption } from '../components/LibraryToolbar';
 import { AddBookModal } from '../components/AddBookModal';
-import { SeriesGroup } from '../components/SeriesGroup'; // 🔥 NEW
+import { UpdateProgressModal } from '../components/UpdateProgressModal';
+import { BookCover } from '../components/BookCover';
 import ThemeToggle from '../components/ThemeToggle';
 import { Sidebar } from '../components/Sidebar';
-import type { UserBook } from '../api/types'; // 🔥 NEW
+import { useAuth } from '../context/AuthContext';
 
 export default function Dashboard() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [groupBySeries, setGroupBySeries] = useState(false); // 🔥 NEW
+  const { user } = useAuth();
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [progressBook, setProgressBook] = useState<any>(null);
 
-  const defaultView = (localStorage.getItem('spine_view') as ViewMode) || 'grid';
-  const defaultSort = (localStorage.getItem('spine_sort') as SortOption) || 'newest';
-
-  const search = searchParams.get('search') || '';
-  const viewMode = (searchParams.get('view') as ViewMode) || defaultView;
-  const filterStatus = (searchParams.get('status') as FilterStatus) || 'All';
-  const sortBy = (searchParams.get('sort') as SortOption) || defaultSort;
-  const selectedLanguage = searchParams.get('lang') || 'All';
-  const selectedGenre = searchParams.get('genre') || 'All';
-
-  const updateParam = (key: string, value: string) => {
-    const newParams = new URLSearchParams(searchParams);
-    if (key === 'view') localStorage.setItem('spine_view', value);
-    if (key === 'sort') localStorage.setItem('spine_sort', value);
-    if (value === 'All' || value === '' || (key === 'view' && value === 'grid')) {
-      newParams.delete(key);
-    } else {
-      newParams.set(key, value);
-    }
-    setSearchParams(newParams);
-  };
-
-  const { data: books = [], isLoading, isError } = useQuery({
+  const { data: books = [], isLoading } = useQuery({
     queryKey: ['library'],
     queryFn: () => getMyLibrary(),
   });
@@ -56,7 +30,19 @@ export default function Dashboard() {
   }, [books]);
 
   const continueReadingBook = readingBooks.length > 0 ? readingBooks[0] : null;
-  const otherReadingBooks = readingBooks.slice(1);
+  const favouriteBooks = useMemo(() => books.filter(b => b.isFavourite), [books]);
+
+  // 🔥 Dynamic Yearly Goal Calculation
+  const booksFinishedThisYear = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    return books.filter(b => 
+      b.status === 'Finished' && 
+      new Date(b.addedAt).getFullYear() === currentYear
+    ).length;
+  }, [books]);
+
+  const goalTarget = 24;
+  const goalPercentage = Math.min(100, (booksFinishedThisYear / goalTarget) * 100);
 
   const readingActivity = useMemo(() => {
     const activity: Record<string, number> = {};
@@ -65,198 +51,143 @@ export default function Dashboard() {
         const today = new Date().toISOString().split('T')[0];
         activity[today] = Math.min(4, (activity[today] || 0) + 1);
       }
-      if (book.status === 'Finished') {
-        const dayOffset = Math.floor(Math.random() * 30);
-        const d = new Date();
-        d.setDate(d.getDate() - dayOffset);
-        const key = d.toISOString().split('T')[0];
-        activity[key] = Math.min(4, (activity[key] || 0) + 2);
-      }
     });
     return activity;
   }, [books]);
 
-  const { uniqueLanguages, uniqueGenres } = useMemo(() => {
-    const langs = new Set<string>();
-    const genreSet = new Set<string>();
-    books.forEach((book) => {
-      if (book.language) langs.add(book.language);
-      if (book.genres) book.genres.split(',').forEach((g) => { const clean = g.trim(); if (clean) genreSet.add(clean); });
-    });
-    return { uniqueLanguages: Array.from(langs).sort(), uniqueGenres: Array.from(genreSet).sort() };
-  }, [books]);
-
-  const filteredBooks = useMemo(() => {
-    let result = books.filter((b) => {
-      const matchesSearch = b.title.toLowerCase().includes(search.toLowerCase()) || b.author.toLowerCase().includes(search.toLowerCase());
-      const matchesStatus = filterStatus === 'All' || b.status === filterStatus;
-      const matchesLanguage = selectedLanguage === 'All' || b.language === selectedLanguage;
-      const matchesGenre = selectedGenre === 'All' || (b.genres && b.genres.toLowerCase().includes(selectedGenre.toLowerCase()));
-      return matchesSearch && matchesStatus && matchesLanguage && matchesGenre;
-    });
-
-    result = [...result].sort((a, b) => {
-      switch (sortBy) {
-        case 'title': return a.title.localeCompare(b.title);
-        case 'author': return a.author.localeCompare(b.author);
-        case 'rating': return (b.personalRating ?? 0) - (a.personalRating ?? 0);
-        default: return new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime();
-      }
-    });
-    return result;
-  }, [books, search, filterStatus, selectedLanguage, selectedGenre, sortBy]);
-
-  // 🔥 GROUPING LOGIC
-  const groupedBooks = useMemo(() => {
-    const groups: Record<string, UserBook[]> = {};
-    
-    filteredBooks.forEach((book) => {
-      // Normalize the series name (e.g., "the stormlight archive series" -> "stormlight archive")
-      let key = book.seriesName 
-        ? book.seriesName.replace(/the\s+/i, '').replace(/\s+series/i, '').trim()
-        : 'Standalone Books';
-
-      // Capitalize for display
-      if (key !== 'Standalone Books') {
-        key = key.replace(/\b\w/g, l => l.toUpperCase());
-      }
-
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(book);
-    });
-    
-    return groups;
-  }, [filteredBooks]);
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  };
 
   return (
     <div className="h-screen overflow-hidden flex bg-bg">
-      <div className="flex-shrink-0 hidden md:block">
-        <Sidebar />
-      </div>
+      <div className="flex-shrink-0 hidden md:block"><Sidebar /></div>
 
       <main className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 border-b border-border bg-surface flex items-center justify-between px-6 md:px-8 gap-4 flex-shrink-0">
-          <div className="flex-1 max-w-lg relative group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted group-focus-within:text-primary transition-colors" />
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => updateParam('search', e.target.value)}
-              placeholder="Search by title or author..."
-              className="w-full pl-10 pr-4 py-2 border border-border rounded-lg bg-bg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm transition-all shadow-sm"
-            />
+        {/* Header */}
+        <header className="h-20 border-b border-border bg-surface flex items-center justify-between px-6 md:px-8 gap-4 flex-shrink-0">
+          <div className="flex flex-col">
+            <h1 className="text-2xl font-serif font-bold text-text">
+              {getGreeting()}, {
+                user?.lastName 
+                  ? `${user.lastName}, ${user.firstName}` 
+                  : (user?.firstName || user?.displayName || 'Reader')
+              }
+            </h1>
+            <p className="text-sm text-text-muted mt-1">Ready to dive into a new world?</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <ThemeToggle />
-            <motion.button 
+            <motion.button
               whileTap={{ scale: 0.96 }}
-              onClick={() => setIsModalOpen(true)}
-              className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-hover transition-all text-sm font-medium shadow-sm hover:shadow-md"
+              onClick={() => setIsAddModalOpen(true)}
+              className="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-xl hover:bg-primary-hover transition-all text-sm font-medium shadow-sm hover:shadow-md"
             >
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Add Book</span>
+              <Plus className="w-4 h-4" /> Add Book
             </motion.button>
           </div>
         </header>
 
         <div className="flex-1 overflow-y-auto p-6 md:p-8">
           {isLoading ? (
-            <div className="animate-pulse space-y-8">
-              <div className="h-44 bg-surface rounded-2xl border border-border w-full"></div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[1, 2, 3, 4].map((i) => <div key={i} className="h-24 bg-surface rounded-xl border border-border"></div>)}
-              </div>
-              <div className="h-40 bg-surface rounded-xl border border-border w-full"></div>
-            </div>
-          ) : isError ? (
-            <div className="text-center py-20 text-red-500">Failed to load library.</div>
+             <div className="animate-pulse space-y-8">
+               <div className="h-64 bg-surface rounded-2xl border border-border w-full"></div>
+             </div>
           ) : (
-            <>
-              {continueReadingBook && (
-                <ContinueReadingBanner book={continueReadingBook} onLogProgress={() => {}} />
-              )}
+            <div className="max-w-7xl mx-auto space-y-8 pb-12">
               
-              {otherReadingBooks.length > 0 && (
-                <ContinueReadingRow books={otherReadingBooks} />
+              {/* Bento Top Section */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                {/* Left Col (Hero) */}
+                <div className="lg:col-span-2 space-y-6">
+                  {continueReadingBook ? (
+                    <ContinueReadingBanner
+                      book={continueReadingBook}
+                      onLogProgress={() => setProgressBook(continueReadingBook)}
+                    />
+                  ) : (
+                    <div className="bg-gradient-to-br from-primary/10 to-transparent border border-primary/20 rounded-2xl p-8 text-center flex flex-col items-center justify-center min-h-[220px]">
+                      <BookOpen className="w-12 h-12 text-primary/40 mb-4" />
+                      <h3 className="text-xl font-serif font-bold mb-2">No active reads</h3>
+                      <p className="text-sm text-text-muted mb-4">Start a new book to see it here.</p>
+                    </div>
+                  )}
+                  
+                  <StatsRow books={books} onReadingClick={() => {}} />
+                </div>
+
+                {/* Right Col (Quote & Goal) */}
+                <div className="flex flex-col gap-6">
+                  <QuoteCard />
+                  
+                  {/* Reading Goal Card */}
+                  <div className="bg-surface border border-border rounded-2xl p-6 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Flame className="w-5 h-5 text-orange-500" />
+                        <h3 className="font-serif font-bold">Yearly Goal</h3>
+                      </div>
+                      <p className="text-sm text-text-muted">
+                        You've read {booksFinishedThisYear} {booksFinishedThisYear === 1 ? 'book' : 'books'} this year.
+                      </p>
+                    </div>
+                    <div className="mt-6">
+                      <div className="flex justify-between text-xs mb-1.5 font-medium">
+                        <span>Progress</span>
+                        <span>{booksFinishedThisYear} / {goalTarget} Books</span>
+                      </div>
+                      <div className="h-2 bg-bg rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-primary transition-all duration-500" 
+                          style={{ width: `${goalPercentage}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Favourites Row */}
+              {favouriteBooks.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-xl font-serif font-bold">Your Favourites</h2>
+                    <Link to="/library" className="text-sm text-primary hover:underline flex items-center gap-1">
+                      View All <ArrowRight className="w-4 h-4" />
+                    </Link>
+                  </div>
+                  <div className="flex gap-6 overflow-x-auto pb-4 snap-x scrollbar-hide">
+                    {favouriteBooks.map((book, i) => (
+                      <div key={book.id} className="w-32 md:w-40 flex-shrink-0 snap-start">
+                        <BookCover book={book} index={i} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
 
-              <StatsRow books={books} onReadingClick={() => updateParam('status', 'Reading')} />
-
-              <QuoteCard />
-
-              {books.length > 0 && (
+              {/* Heatmap */}
+              <div>
                 <ReadingHeatmap activity={readingActivity} />
-              )}
+              </div>
               
-              {books.length > 0 && (
-                <LibraryToolbar
-                  viewMode={viewMode}
-                  setViewMode={(v) => updateParam('view', v)}
-                  filterStatus={filterStatus}
-                  setFilterStatus={(s) => updateParam('status', s)}
-                  languages={uniqueLanguages}
-                  selectedLanguage={selectedLanguage}
-                  setSelectedLanguage={(l) => updateParam('lang', l)}
-                  genres={uniqueGenres}
-                  selectedGenre={selectedGenre}
-                  setSelectedGenre={(g) => updateParam('genre', g)}
-                  sortBy={sortBy}
-                  setSortBy={(s) => updateParam('sort', s)}
-                  groupBySeries={groupBySeries}
-                  setGroupBySeries={setGroupBySeries}
-                />
-              )}
-              
-              {books.length === 0 ? (
-                <EmptyLibrary onAddClick={() => setIsModalOpen(true)} />
-              ) : filteredBooks.length === 0 ? (
-                <div className="text-center py-20 text-text-muted bg-surface/50 border border-border rounded-xl">
-                  No books found matching your criteria.
-                </div>
-              ) : groupBySeries ? (
-                /* 🔥 GROUPED VIEW */
-                <div className="flex flex-col gap-6 pb-12">
-                  {Object.entries(groupedBooks).map(([seriesName, booksInSeries]) => {
-                    if (seriesName === 'Standalone Books') {
-                      return (
-                        <div key={seriesName} className="mt-8">
-                          <h3 className="text-xl font-serif font-bold mb-4 border-b border-border pb-2">Standalone Books</h3>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                            {booksInSeries.map((book, i) => (
-                              <BookCover key={book.id} book={book} index={i} />
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    }
-                    return (
-                      <SeriesGroup 
-                        key={seriesName} 
-                        seriesName={seriesName} 
-                        books={booksInSeries} 
-                      />
-                    );
-                  })}
-                </div>
-              ) : viewMode === 'grid' ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 pb-12">
-                  {filteredBooks.map((book, index) => (
-                    <BookCover key={book.id} book={book} index={index} />
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col gap-3 pb-12">
-                  {filteredBooks.map((book) => (
-                    <BookListItem key={book.id} book={book} />
-                  ))}
-                </div>
-              )}
-            </>
+              {/* Bottom Action */}
+              <div className="text-center pt-8">
+                <Link to="/library" className="inline-flex items-center gap-2 bg-surface border border-border px-6 py-3 rounded-xl font-medium hover:border-primary transition-colors text-text shadow-sm hover:shadow-md">
+                  Browse Full Library <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            </div>
           )}
         </div>
       </main>
 
-      <AddBookModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <AddBookModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
+      {progressBook && <UpdateProgressModal book={progressBook} onClose={() => setProgressBook(null)} />}
     </div>
   );
 }
