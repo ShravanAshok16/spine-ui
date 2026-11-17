@@ -1,32 +1,60 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { AnimatePresence } from 'framer-motion';
 import { useAuth } from './context/AuthContext';
+import { UIProvider, useUI } from './context/UIContext';
+import { PageTransition } from './components/PageTransition';
+import { FloatingAddButton } from './components/FloatingAddButton';
+import { AddBookModal } from './components/AddBookModal';
+import { MobileNav } from './components/MobileNav';
+
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Library from './pages/Library';
+import Discover from './pages/Discover';
+import BookDetails from './pages/BookDetails';
+import ForYou from './pages/ForYou';
 import type { ReactNode } from 'react';
+
+// Global Modals Component
+function GlobalModals() {
+  const { isAddModalOpen, closeAddModal } = useUI();
+  return <AddBookModal isOpen={isAddModalOpen} onClose={closeAddModal} />;
+}
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { token } = useAuth();
   if (!token) return <Navigate to="/login" replace />;
-  return <>{children}</>;
+  
+  return (
+    <>
+      {children}
+      <MobileNav />
+      <FloatingAddButton />
+      <GlobalModals />
+    </>
+  );
 }
 
 export default function App() {
+  const location = useLocation();
+
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        }
-      />
-      <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
+    <UIProvider>
+      <AnimatePresence mode="wait">
+        <Routes location={location} key={location.pathname}>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          
+          <Route path="/dashboard" element={<ProtectedRoute><PageTransition><Dashboard /></PageTransition></ProtectedRoute>} />
+          <Route path="/library" element={<ProtectedRoute><PageTransition><Library /></PageTransition></ProtectedRoute>} />
+          <Route path="/discover" element={<ProtectedRoute><PageTransition><Discover /></PageTransition></ProtectedRoute>} />
+          <Route path="/books/:id" element={<ProtectedRoute><PageTransition><BookDetails /></PageTransition></ProtectedRoute>} />
+          <Route path="/for-you" element={<ProtectedRoute><PageTransition><ForYou /></PageTransition></ProtectedRoute>} />
+          
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </AnimatePresence>
+    </UIProvider>
   );
 }

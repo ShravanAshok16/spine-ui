@@ -42,3 +42,29 @@ body {
 .animate-fade-up {
   animation: fade-up 400ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+
+/* Premium Minimal Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(120, 113, 108, 0.3); /* text-muted with opacity */
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 113, 108, 0.6);
+}
+
+/* Only show the horizontal scrollbar on Discover carousels on desktop */
+@media (max-width: 768px) {
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}

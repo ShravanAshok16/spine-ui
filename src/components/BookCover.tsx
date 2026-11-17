@@ -1,13 +1,12 @@
 import { useState, type SyntheticEvent, useMemo } from 'react';
-import { BookOpen, Trash2 } from 'lucide-react';
+import { BookOpen, Trash2, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
-import { deleteUserBook } from '../api/library';
+import { deleteUserBook, toggleFavourite } from '../api/library';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 import type { UserBook } from '../api/types';
-import { Heart } from 'lucide-react'; // Add this import
-import { toggleFavourite } from '../api/library'; // Add this import
+import { LanguageBadge } from './LanguageBadge'; // 🔥 Imported LanguageBadge
 
 interface Props {
   book: UserBook;
@@ -17,6 +16,7 @@ interface Props {
 
 const statusStyles: Record<string, string> = {
   Reading: 'bg-blue-500/90 text-white',
+  Paused: 'bg-amber-500/90 text-white',
   Finished: 'bg-green-500/90 text-white',
   Unread: 'bg-gray-500/80 text-white',
   DNF: 'bg-red-500/90 text-white',
@@ -48,10 +48,32 @@ export function BookCover({ book, onClick, index = 0 }: Props) {
   });
 
   const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent opening the book details page if we add one later
+    e.stopPropagation(); 
     if (confirm(`Remove "${book.title}" from your library?`)) {
       deleteMutation.mutate();
     }
+  };
+
+  // 🔥 Favourite Mutation (Optimistic)
+  const favouriteMutation = useMutation({
+    mutationFn: () => toggleFavourite(book.id),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['library'] });
+      const previous = queryClient.getQueryData<UserBook[]>(['library']);
+      queryClient.setQueryData<UserBook[]>(['library'], (old) =>
+        old?.map(b => b.id === book.id ? { ...b, isFavourite: !b.isFavourite } : b)
+      );
+      return { previous };
+    },
+    onError: (err, _, context) => {
+      if (context?.previous) queryClient.setQueryData(['library'], context.previous);
+      toast.error('Failed to update favourite');
+    }
+  });
+
+  const handleFavourite = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    favouriteMutation.mutate();
   };
 
   const gradientClass = useMemo(() => {
@@ -65,38 +87,6 @@ export function BookCover({ book, onClick, index = 0 }: Props) {
   };
 
   const primaryGenre = book.genres?.split(',')[0]?.trim();
-
-  // Inside the component, add this mutation:
-const favouriteMutation = useMutation({
-  mutationFn: () => toggleFavourite(book.id),
-  onMutate: async () => {
-    await queryClient.cancelQueries({ queryKey: ['library'] });
-    const previous = queryClient.getQueryData<UserBook[]>(['library']);
-    queryClient.setQueryData<UserBook[]>(['library'], (old) =>
-      old?.map(b => b.id === book.id ? { ...b, isFavourite: !b.isFavourite } : b)
-    );
-    return { previous };
-  },
-  onError: (err, _, context) => {
-    if (context?.previous) queryClient.setQueryData(['library'], context.previous);
-    toast.error('Failed to update favourite');
-  }
-});
-
-const handleFavourite = (e: React.MouseEvent) => {
-  e.stopPropagation();
-  favouriteMutation.mutate();
-};
-
-// Then, inside the cover container (next to the delete button or status badge):
-<div className="absolute bottom-2 right-2 z-20">
-  <button
-    onClick={handleFavourite}
-    className="bg-black/60 backdrop-blur-sm p-1.5 rounded-full text-white hover:bg-black/80 transition-colors"
-  >
-    <Heart className={`w-4 h-4 ${book.isFavourite ? 'fill-red-500 text-red-500' : ''}`} />
-  </button>
-</div>
 
   return (
     <motion.div
@@ -144,6 +134,11 @@ const handleFavourite = (e: React.MouseEvent) => {
           </div>
         )}
 
+        {/* 🔥 Language Badge (Bottom Left) */}
+        <div className="absolute bottom-2 left-2 z-10">
+          <LanguageBadge code={book.language} size="sm" />
+        </div>
+
         {/* Status Badge */}
         <div className="absolute top-2 right-2">
           <span className={cn(
@@ -154,8 +149,39 @@ const handleFavourite = (e: React.MouseEvent) => {
           </span>
         </div>
 
+                {/* Favourite Button (Only show if it's in the library) */}
+        {book.status && (
+          <div className="absolute bottom-2 right-2 z-20">
+            <button
+              onClick={handleFavourite}
+              className="bg-black/60 backdrop-blur-sm p-1.5 rounded-full text-white hover:bg-black/80 transition-colors"
+              title="Toggle Favourite"
+            >
+              <Heart className={cn("w-4 h-4", book.isFavourite ? 'fill-red-500 text-red-500' : '')} />
+            </button>
+          </div>
+        )}
+
+        {/* Delete Button (Visible on Hover) */}
+        {book.status && (
+          <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+            <button
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+              className="bg-black/60 hover:bg-red-500 backdrop-blur-sm p-1.5 rounded-full text-white transition-colors"
+              title="Remove from library"
+            >
+              {deleteMutation.isPending ? (
+                <span className="block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+              ) : (
+                <Trash2 className="w-4 h-4" />
+              )}
+            </button>
+          </div>
+        )}
+
         {/* 🔥 Delete Button (Visible on Hover) */}
-        <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
           <button
             onClick={handleDelete}
             disabled={deleteMutation.isPending}
@@ -169,15 +195,6 @@ const handleFavourite = (e: React.MouseEvent) => {
             )}
           </button>
         </div>
-
-        {/* Genre Chip */}
-        {primaryGenre && (
-          <div className="absolute bottom-2 left-2">
-            <span className="text-[10px] uppercase tracking-wider font-medium px-1.5 py-0.5 rounded bg-black/60 text-white backdrop-blur-sm">
-              {primaryGenre}
-            </span>
-          </div>
-        )}
 
         {/* Progress Bar */}
         {book.status === 'Reading' && book.totalPages && (

@@ -3,7 +3,7 @@ SPINE UI — MASTER ARCHITECTURE & DAILY NOTES
 =====================================================================
 Author: Shravan Ashok
 Project: Spine (Book Library & Social Tracker — Frontend)
-Coverage: Sprint 7, Day 1 through Day 5
+Coverage: Sprint 7, Day 1 through Day 8
 =====================================================================
 
 =====================================================================
@@ -124,12 +124,48 @@ PART 4 — DAY 5: ARCHITECTURE SPLIT & OPTIMISTIC UI
 - Selecting books triggers a Framer Motion sticky bottom bar.
 - API: `POST /api/UserBooks/batch-delete`.
 
---- Manual Series Creation ---
-- `CreateSeriesModal` allows linking existing books into a new Series.
-- API: `POST /api/UserBooks/link-series`.
+=====================================================================
+PART 5 — DAY 6 & 7: DISCOVERY & DETAILS (The Goodreads Refactor)
+=====================================================================
+
+--- The Discover Page ---
+- Uses Netflix-style horizontal carousels.
+- Extracted the `useDiscoverRow` hook OUTSIDE the component to prevent React infinite re-renders (which caused infinite skeletons).
+- Fetches 5 rows: Trending Fantasy, Popular in Kannada, Popular in Tamil, Mystery, Romance.
+- Edge Fade Mask: A gradient `absolute right-0` div hides the hard edge of the carousel.
+
+--- The Book Details Page ---
+- **Instant Load:** Passed the `book` object via `location.state` from Discover. `useQuery` uses `placeholderData` so the UI renders instantly while fetching the full details in the background.
+- **The "Try Again" Button:** Because Google Books/OpenLibrary can fail, if `!hasDescription`, we show a retry button that calls `refetch()`.
+- **Genres:** Handled both string and array formats from the backend.
+- **Buy Links:** Dynamic Amazon and Flipkart search links generated from the ISBN.
 
 =====================================================================
-PART 5 — PROBLEMS FACED AND HOW WE FIXED THEM
+PART 6 — DAY 8: GLOBAL UI & PAGE TRANSITIONS
+=====================================================================
+
+--- Global UI Context (`UIContext`) ---
+- Lifted the `AddBookModal` state out of individual pages.
+- Any component can now use `const { openAddModal } = useUI()`.
+
+--- Floating Action Button (`FloatingAddButton`) ---
+- Transformed into a Speed Dial: Search, Scan, Manual.
+- Uses `useScroll` from Framer Motion to hide on scroll down and reappear on scroll up.
+
+--- Page Transitions ---
+- Wrapped `<Routes>` in `<AnimatePresence mode="wait">`.
+- Created `PageTransition.tsx`: Blur Dissolve (opacity 0 -> 1, blur 8px -> 0px). Respects `prefers-reduced-motion`.
+
+--- Mobile Navigation ---
+- Transformed from a static bar to a Floating Pill.
+- Added Seesaw Tilt: `whileTap={{ scale: 0.85, rotate: -10 }}`.
+
+--- Spring Physics ---
+- Modals (`AddBookModal`, `UpdateProgressModal`) now pop in with a spring physics (`stiffness: 400, damping: 25`).
+- Inputs now shake on error: `animate={{ x: [-10, 10, -10, 10, 0] }}`.
+
+=====================================================================
+PART 7 — PROBLEMS FACED AND HOW WE FIXED THEM
 =====================================================================
 
 1. **Back Button Bypass**
@@ -164,13 +200,25 @@ PART 5 — PROBLEMS FACED AND HOW WE FIXED THEM
    - Cause: `dotnet watch` held onto the DLL.
    - Fix: `taskkill /F /IM dotnet.exe` and restart.
 
+9. **Infinite Skeletons on Discover**
+   - Cause: Defining `useDiscoverRow` inside the component caused React to lose state.
+   - Fix: Moved `useDiscoverRow` outside the component.
+
+10. **Missing Book Descriptions**
+    - Cause: Backend cached incomplete results and OpenLibrary failed to provide descriptions.
+    - Fix: Backend switched priority to Google Books, only caches complete results, and frontend added the "Try Again" button.
+
+11. **Syntax Errors (`apiClient.get/...`)**
+    - Cause: Missing backticks and parentheses.
+    - Fix: Corrected string interpolation.
+
 =====================================================================
-PART 6 — WHAT WENT WELL
+PART 8 — WHAT WENT WELL
 =====================================================================
 - **Architecture:** Separating the Dashboard from the Library makes the app feel professional.
-- **User Experience:** Optimistic UI makes the app feel lightning fast.
+- **User Experience:** Optimistic UI makes the app feel lightning fast. Global Contexts make the FAB work everywhere.
 - **Design System:** Warm Minimalism + Framer Motion gives the app a premium feel.
-- **Scalability:** The Global Catalog pattern (on the backend) ensures we don't bloat the database.
+- **Resilience:** The "Try Again" button and caching strategy ensure the app doesn't break when external APIs fail.
 
 =====================================================================
 END OF NOTES

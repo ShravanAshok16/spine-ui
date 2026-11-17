@@ -1,24 +1,22 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, ArrowRight, BookOpen, Flame } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { getMyLibrary } from '../api/library';
 import { StatsRow } from '../components/StatsRow';
-import { ContinueReadingBanner } from '../components/ContinueReadingBanner';
+import { ContinueReadingCard } from '../components/ContinueReadingCard';
 import { QuoteCard } from '../components/QuoteCard';
 import { ReadingHeatmap } from '../components/ReadingHeatmap';
-import { AddBookModal } from '../components/AddBookModal';
-import { UpdateProgressModal } from '../components/UpdateProgressModal';
 import { BookCover } from '../components/BookCover';
 import ThemeToggle from '../components/ThemeToggle';
 import { Sidebar } from '../components/Sidebar';
 import { useAuth } from '../context/AuthContext';
+import { useUI } from '../context/UIContext'; // 🔥 Imported useUI
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [progressBook, setProgressBook] = useState<any>(null);
+  const { openAddModal } = useUI(); // 🔥 Replaced local state
 
   const { data: books = [], isLoading } = useQuery({
     queryKey: ['library'],
@@ -43,6 +41,20 @@ export default function Dashboard() {
 
   const goalTarget = 24;
   const goalPercentage = Math.min(100, (booksFinishedThisYear / goalTarget) * 100);
+
+  // 🔥 The Insight Headline Logic
+  const generateInsight = () => {
+    const finishedThisYear = books.filter(b => b.status === 'Finished').length;
+    
+    if (books.length === 0) return "Let's start building your library today.";
+    if (finishedThisYear >= goalTarget) return "Incredible! You've hit your yearly goal. Time to set a new one?";
+    if (finishedThisYear > 0) {
+      const pace = (finishedThisYear / (new Date().getMonth() + 1)) * 12;
+      if (pace > goalTarget) return `You're on track to beat your goal! (${finishedThisYear} / ${goalTarget} books).`;
+      return `You're ${finishedThisYear} books into your ${goalTarget}-book goal. Keep going!`;
+    }
+    return "Ready to dive into a new world? Your books are waiting.";
+  };
 
   const readingActivity = useMemo(() => {
     const activity: Record<string, number> = {};
@@ -77,13 +89,14 @@ export default function Dashboard() {
                   : (user?.firstName || user?.displayName || 'Reader')
               }
             </h1>
-            <p className="text-sm text-text-muted mt-1">Ready to dive into a new world?</p>
+            {/* 🔥 Insight Headline */}
+            <p className="text-sm text-text-muted mt-1">{generateInsight()}</p>
           </div>
           <div className="flex items-center gap-4">
             <ThemeToggle />
             <motion.button
               whileTap={{ scale: 0.96 }}
-              onClick={() => setIsAddModalOpen(true)}
+              onClick={openAddModal} // 🔥 Wired to global context
               className="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-xl hover:bg-primary-hover transition-all text-sm font-medium shadow-sm hover:shadow-md"
             >
               <Plus className="w-4 h-4" /> Add Book
@@ -105,10 +118,7 @@ export default function Dashboard() {
                 {/* Left Col (Hero) */}
                 <div className="lg:col-span-2 space-y-6">
                   {continueReadingBook ? (
-                    <ContinueReadingBanner
-                      book={continueReadingBook}
-                      onLogProgress={() => setProgressBook(continueReadingBook)}
-                    />
+                    <ContinueReadingCard book={continueReadingBook} />
                   ) : (
                     <div className="bg-gradient-to-br from-primary/10 to-transparent border border-primary/20 rounded-2xl p-8 text-center flex flex-col items-center justify-center min-h-[220px]">
                       <BookOpen className="w-12 h-12 text-primary/40 mb-4" />
@@ -185,9 +195,6 @@ export default function Dashboard() {
           )}
         </div>
       </main>
-
-      <AddBookModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
-      {progressBook && <UpdateProgressModal book={progressBook} onClose={() => setProgressBook(null)} />}
     </div>
   );
 }

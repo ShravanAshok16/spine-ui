@@ -78,13 +78,25 @@ export function AddBookModal({ isOpen, onClose }: Props) {
     setIsAdding(true);
     try {
       const booksToAdd = results.filter(b => selectedIds.has(b.isbn || `${b.title}-${b.author}`));
-      await Promise.all(booksToAdd.map(book => 
-        apiClient.post('/api/UserBooks/manual', {
-          title: book.title, author: book.author, isbn: book.isbn, description: book.description,
-          pageCount: book.pageCount, genres: book.genres, language: book.language, 
-          coverUrl: book.coverUrl, seriesName: book.seriesName, seriesPosition: book.seriesPosition 
-        })
-      ));
+      await Promise.all(booksToAdd.map(book => {
+  // 🔥 FIX: Handle Genres (Array vs String) and ensure no undefined fields
+        const safeGenres = Array.isArray(book.genres) 
+          ? book.genres.join(', ') 
+          : (book.genres || null);
+            
+        return apiClient.post('/api/UserBooks/manual', {
+          title: book.title,
+          author: book.author || 'Unknown Author',
+          isbn: book.isbn || null,
+          description: book.description || null,
+          pageCount: book.pageCount || null,
+          genres: safeGenres,
+          language: book.language || 'en',
+          coverUrl: book.coverUrl || null,
+          seriesName: book.seriesName || null,
+          seriesPosition: book.seriesPosition || null
+        });
+      }));
       toast.success(`${booksToAdd.length} book${booksToAdd.length > 1 ? 's' : ''} added!`);
       queryClient.invalidateQueries({ queryKey: ['library'] });
       onClose();

@@ -19,6 +19,9 @@ export interface UserBook {
   addedAt: string;
   seriesId: string | null;
   seriesName: string | null;
+  isbn: string | null;
+  description: string | null;
+  pageCount: number | null;
 }
 
 export interface Quote {

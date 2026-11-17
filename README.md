@@ -2,7 +2,7 @@
 
 A production-grade, responsive React frontend for tracking physical book collections, reading progress, and sharing libraries with friends.
 
-🌐 **Live App:** *(Coming in Sprint 7)*
+🌐 **Live App:** *(Coming soon)*
 🔌 **Backend Repo:** [ShravanAshok16/Spine](https://github.com/ShravanAshok16/Spine)
 
 ---
@@ -10,22 +10,23 @@ A production-grade, responsive React frontend for tracking physical book collect
 ## 📌 Current Status
 
 **Phase:** Sprint 7 — Web Frontend Core
-**Progress:** `[██████░░░░] 60%`
+**Progress:** `[████████░░] 80%`
 
 ### ✅ Done
 - **Vite + React 19 + TypeScript** foundation.
 - **Tailwind CSS v4** with custom "Warm Minimalism" theme.
-- **Global State:** AuthContext (JWT decoding), ThemeContext (Day/Night toggle with physics).
+- **Global State:** `AuthContext`, `ThemeContext` (Physics toggle), `UIContext` (Global modal).
 - **The Two-Mode Architecture:**
-  - `/dashboard`: The "Morning Coffee" view (Greeting, Stats, Favourites Carousel, Quote, Heatmap).
-  - `/library`: The "Vault" (Heavy filtering, Series Grouping, Batch Delete, Create Series).
-- **Unified Add Book Modal:** ISBN instant-add, Multiselect Title/Author search, Manual fallback.
-- **Optimistic UI:** Instant UI updates for favouriting, updating progress, and changing statuses.
-- **Granular Tracking:** Ownership statuses (Owned, Wishlist, LentOut, Sold, etc.), Paused reading status, and Favourites.
-- **Advanced UI Components:** Framer Motion sliding pills, Jelly Icons, Animated Modals, and Skeleton Loaders.
+  - `/dashboard`: Morning Coffee view (Greeting, Stats, Favourites, Heatmap).
+  - `/library`: The Vault (Filters, Batch Delete, Series Grouping).
+- **Discovery:** `/discover` (Netflix-style carousels) and `/for-you` (Recommendations).
+- **Book Details:** Instant loading via state passing + background fetch for full data.
+- **Premium UI:** Framer Motion Page Transitions (Blur Dissolve), Floating Pill Mobile Nav (Seesaw Tilt), Speed Dial FAB.
+- **Optimistic UI:** Instant favourite/progress updates.
+- **Offline Resilience:** Caching external searches for 15 minutes.
 
 ### 🚧 In Progress
-- Preparing for Day 6: Discover & Recommendations Pages.
+- Preparing for Sprint 8 (Reading Sessions, Analytics, Global Search).
 
 ---
 
@@ -34,15 +35,15 @@ A production-grade, responsive React frontend for tracking physical book collect
 ```text
 spine-ui/
 ├── src/
-│ ├── api/ # Axios client, library.ts, quotes.ts, types.ts
-│ ├── components/ # AddBookModal, BookCover, Sidebar, UpdateProgressModal, etc.
-│ ├── context/ # AuthContext, ThemeContext
-│ ├── pages/ # Dashboard, Library, Login, Register
-│ ├── App.tsx # Routing (Protected routes)
-│ ├── main.tsx # Providers + Sentry init
-│ └── index.css # Tailwind theme
+│ ├── api/                  # Axios client, library.ts, quotes.ts
+│ ├── components/           # BookCover, FloatingAddButton, PageTransition, etc.
+│ ├── context/              # AuthContext, ThemeContext, UIContext
+│ ├── pages/                # Dashboard, Library, Discover, ForYou, BookDetails
+│ ├── App.tsx               # Routing (AnimatePresence + Protected Routes)
+│ ├── main.tsx              # Providers + Sentry
+│ └── index.css             # Tailwind theme
 ├──.env.example
-├── vercel.json
+├── vite.config.ts
 └── README.md
 
 

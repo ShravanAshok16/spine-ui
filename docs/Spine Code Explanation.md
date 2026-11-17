@@ -1,7 +1,7 @@
 =====================================================================
 SPINE UI — COMPLETE CODE EXPLANATION
 =====================================================================
-Coverage: Sprint 7, Day 1 through Day 5
+Coverage: Sprint 7, Day 1 through Day 8
 =====================================================================
 
 =====================================================================
@@ -26,6 +26,11 @@ PART 1 — API & CONTEXTS
   - Initializes theme from localStorage ('spine_theme') or `prefers-color-scheme`.
   - `useEffect`: Toggles `.dark` class on `document.documentElement` and saves to localStorage.
 
+--- src/context/UIContext.tsx (NEW) ---
+  - Manages global state for the `AddBookModal`.
+  - Exposes `isAddModalOpen`, `openAddModal()`, and `closeAddModal()`.
+  - Wrapped around `<App />` in `main.tsx` or `App.tsx`.
+
 --- src/api/library.ts ---
   - `getMyLibrary()`: GET `/api/UserBooks`.
   - `searchExternalBooks(query)`: GET `/api/Books/search?q=`.
@@ -39,38 +44,43 @@ PART 1 — API & CONTEXTS
   - `getDailyQuote()`: GET `/api/Quotes/daily`.
 
 =====================================================================
-PART 2 — DASHBOARD & LIBRARY
+PART 2 — PAGES
 =====================================================================
 
 --- src/pages/Dashboard.tsx ---
   - **Purpose:** The "Morning Coffee" view.
-  - `useSearchParams` manages URL state.
   - `greeting`: Calculates "Good morning/evening" based on `new Date().getHours()`. Formats `user.lastName, user.firstName`.
-  - `useQuery`: Fetches library with queryKey `['library']`.
-  - `readingBooks`: Memoized filter for `status === 'Reading'`.
-  - `booksFinishedThisYear`: Dynamic calculation for the Yearly Goal card.
-  - `favouriteBooks`: Filters `books.filter(b => b.isFavourite)`.
-  - **Renders:** Bento grid with Continue Reading banner (or empty state), Stats Row, Quote Card, Yearly Goal card, Favourites carousel, and Heatmap.
+  - `generateInsight()`: Analyzes `booksFinishedThisYear` to return a dynamic sentence (e.g., "You're on track to beat your goal!").
+  - **Renders:** Bento grid with `ContinueReadingCard`, `StatsRow`, `QuoteCard`, `Yearly Goal` (Segment Bar), Favourites carousel, and `ReadingHeatmap`.
+  - Uses `useUI().openAddModal` for the Add Book button.
 
 --- src/pages/Library.tsx ---
   - **Purpose:** The "Vault" for heavy management.
   - `selectedBooks`: A `Set<string>` for Batch Selection.
-  - `handleBatchDelete`: Calls `batchDeleteBooks`, then invalidates `['library']` and clears the set.
-  - **Renders:** `LibraryToolbar`, Grid/List view, SeriesGroup accordions.
+  - `handleBatchDelete`: Calls `batchDeleteBooks`, then invalidates `['library']`.
+  - **Renders:** `LibraryToolbar`, Grid/List view, `SeriesGroup` accordions.
   - **Sticky Action Bar:** If `selectedBooks.size > 0`, renders a fixed bottom bar with a "Delete Selected" button.
 
---- src/components/LibraryToolbar.tsx ---
-  - **Status Tabs:** Uses Framer Motion `layoutId="active-pill"` for the sliding background.
-  - **View Toggle:** Grid vs List with `whileTap`.
-  - **Filters:** Language, Genre, Sort.
+--- src/pages/Discover.tsx ---
+  - Uses Netflix-style horizontal carousels.
+  - `useDiscoverRow`: Extracted outside the component to prevent infinite re-renders. Uses `staleTime: 15 minutes`.
+  - `DiscoverRow`: Renders a `<Link>` to "See all". Passes `state: { book }` via `navigate()` to `BookDetails` for instant loading.
+  - Renders a Hero Banner and 5 rows of books.
+
+--- src/pages/BookDetails.tsx ---
+  - **Instant Load:** `const initialBook = location.state?.book`.
+  - `useQuery` with `placeholderData: initialBook` shows data instantly while fetching from `/api/Books/details/{id}` in the background.
+  - **UI:** Background blur using `style={{ backgroundImage: url(${book.coverUrl}) }}`.
+  - **Missing Data:** If `!hasDescription`, renders a "Try fetching description again" button that calls `refetch()`.
 
 =====================================================================
-PART 3 — MODALS & ANIMATIONS
+PART 3 — COMPONENTS & MODALS
 =====================================================================
 
 --- src/components/AddBookModal.tsx ---
   - **Framer Motion:** `AnimatePresence` wraps the modal.
-  - **Multiselect:** `selectedIds` Set tracks clicked books. Clicking a cover adds a checkmark overlay.
+  - **Spring Pop:** `transition={{ type: "spring", stiffness: 400, damping: 25 }}`.
+  - **Multiselect:** `selectedIds` Set tracks clicked books.
   - **Sticky Bar:** `initial={{ y: 100 }}` animates up when `selectedIds.size > 0`.
   - **handleSearch:** Regex checks for ISBN. If text, calls `searchExternalBooks`.
   - **handleAddSelected:** `Promise.all` of POST requests to `/api/UserBooks/manual`.
@@ -84,12 +94,31 @@ PART 3 — MODALS & ANIMATIONS
   - **aspect-[2/3]** container.
   - **Fallback Logic:** `showFallback = !book.coverUrl || imageError`. If true, renders a gradient based on the title's char code.
   - **1x1 Pixel Fix:** `handleImageLoad` checks `e.currentTarget.naturalWidth < 10`.
-  - **Status Badges:** `statusStyles` maps `status` to color classes.
-  - **Delete Button:** Visible on hover, triggers `useMutation(deleteUserBook)`.
+  - **Favourite/Delete Buttons:** Only render if `book.status` exists (meaning it is in the user's library, not Discover).
 
 --- src/components/SeriesGroup.tsx ---
   - **Chevron Rotate:** `animate={{ rotate: isOpen ? 90 : 0 }}`.
   - **Height Animation:** `AnimatePresence` with `initial={{ height: 0 }}`.
+
+--- src/components/FloatingAddButton.tsx (NEW) ---
+  - **Hide on Scroll:** `useScroll` from Framer Motion. Hides if `latest > previous`.
+  - **Speed Dial:** Tapping the FAB opens a menu with Search, Scan, and Manual options.
+  - Calls `openAddModal()` from `UIContext`.
+
+--- src/components/PageTransition.tsx (NEW) ---
+  - Wraps route content.
+  - **Blur Dissolve:** `initial={{ opacity: 0, filter: 'blur(8px)' }}` -> `animate={{ opacity: 1, filter: 'blur(0px)' }}`.
+  - Uses `useReducedMotion()` to disable blur if the user has that OS setting enabled.
+
+--- src/components/MobileNav.tsx (NEW) ---
+  - **Floating Pill:** Fixed to the bottom center with `rounded-full`.
+  - **Seesaw Tilt:** `whileTap={{ scale: 0.85, rotate: -10 }}` on the active icon.
+
+--- src/App.tsx ---
+  - Wraps `<Routes>` in `<AnimatePresence mode="wait">`.
+  - Passes `location.pathname` as the `key` to force re-renders on navigation.
+  - Wraps all protected routes in `<PageTransition>`.
+  - Renders `<GlobalModals />` and `<FloatingAddButton />` outside the Routes so they persist.
 
 =====================================================================
 END OF NOTES
