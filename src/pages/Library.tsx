@@ -1,56 +1,80 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Search, Trash2 } from 'lucide-react';
+import { Search, Trash2, X } from 'lucide-react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { getMyLibrary, batchDeleteBooks } from '../api/library';
+import { getMyLibrary, batchDeleteBooks, deleteUserBook } from '../api/library';
 import { BookCover } from '../components/BookCover';
 import { BookListItem } from '../components/BookListItem';
 import { EmptyState } from '../components/EmptyState';
-import { LibraryToolbar, type ViewMode, type FilterStatus, type SortOption } from '../components/LibraryToolbar';
+import { LibraryToolbar, type ViewMode, type FilterStatus, type SortOption, type GridSize } from '../components/LibraryToolbar';
 import { SeriesGroup } from '../components/SeriesGroup';
 import { Sidebar } from '../components/Sidebar';
 import ThemeToggle from '../components/ThemeToggle';
 import type { UserBook } from '../api/types';
 import { CreateSeriesModal } from '../components/CreateSeriesModal';
 import { BookOpen } from 'lucide-react';
-import { useUI } from '../context/UIContext'; // 🔥 Imported useUI
+import { useUI } from '../context/UIContext';
+import { ConfirmDialog } from '../components/ConfirmDialog';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Library() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedBooks, setSelectedBooks] = useState<Set<string>>(new Set());
+  const [isSelectionMode, setIsSelectionMode] = useState(false); // 🔥 New State
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSeriesModalOpen, setIsSeriesModalOpen] = useState(false);
+  const [deleteConfig, setDeleteConfig] = useState<{ ids: string[], title: string, description: string } | null>(null);
+
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { openAddModal } = useUI(); // 🔥 Wired global modal
+  const { openAddModal } = useUI();
 
   const viewMode = (searchParams.get('view') as ViewMode) || 'grid';
+  const gridSize = (searchParams.get('size') as GridSize) || 'md';
   const filterStatus = (searchParams.get('status') as FilterStatus) || 'All';
   const sortBy = (searchParams.get('sort') as SortOption) || 'newest';
   const groupBySeries = searchParams.get('group') === 'true';
   const search = searchParams.get('search') || '';
-  
+  const ownership = searchParams.get('ownership') || 'All';
+  const minRating = searchParams.get('rating') || 'All';
+
   const updateParam = (key: string, value: string) => {
     const newParams = new URLSearchParams(searchParams);
-    if (value === 'All' || value === '' || (key === 'view' && value === 'grid')) newParams.delete(key);
-    else newParams.set(key, value);
+    if (value === 'All' || value === '' || (key === 'view' && value === 'grid') || (key === 'size' && value === 'md')) {
+      newParams.delete(key);
+    } else {
+      newParams.set(key, value);
+    }
     setSearchParams(newParams);
   };
 
   const { data: books = [], isLoading } = useQuery({
     queryKey: ['library'],
     queryFn: () => getMyLibrary(),
+    refetchOnMount: 'always',
+    staleTime: 0,
   });
 
   const filteredBooks = useMemo(() => {
     let result = books.filter((b) => {
       const matchesSearch = b.title.toLowerCase().includes(search.toLowerCase()) || b.author.toLowerCase().includes(search.toLowerCase());
       const matchesStatus = filterStatus === 'All' || b.status === filterStatus;
-      return matchesSearch && matchesStatus;
+      const matchesOwnership = ownership === 'All' || b.ownership === ownership;
+      const matchesRating = minRating === 'All' || ((b.personalRating ?? 0) >= parseInt(minRating));
+      return matchesSearch && matchesStatus && matchesOwnership && matchesRating;
+    });
+    
+    result = [...result].sort((a, b) => {
+      switch (sortBy) {
+        case 'title': return a.title.localeCompare(b.title);
+        case 'author': return a.author.localeCompare(b.author);
+        case 'rating': return (b.personalRating ?? 0) - (a.personalRating ?? 0);
+        default: return new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime();
+      }
     });
     return result;
-  }, [books, search, filterStatus]);
+  }, [books, search, filterStatus, ownership, minRating, sortBy]);
 
   const groupedBooks = useMemo(() => {
     const groups: Record<string, UserBook[]> = {};
@@ -69,19 +93,47 @@ export default function Library() {
     setSelectedBooks(newSet);
   };
 
-  const handleBatchDelete = async () => {
-    if (!confirm(`Are you sure you want to delete ${selectedBooks.size} books?`)) return;
+  const handleBatchDelete = () => {
+    setDeleteConfig({
+      ids: Array.from(selectedBooks),
+      title: 'Delete Selected Books?',
+      description: `Are you sure you want to delete ${selectedBooks.size} books? They will be moved to the Trash Bin.`
+    });
+  };
+
+  const handleIndividualDelete = (id: string, title: string) => {
+    setDeleteConfig({
+      ids: [id],
+      title: 'Delete Book?',
+      description: `Are you sure you want to delete "${title}"? It will be moved to the Trash Bin.`
+    });
+  };
+
+  const executeDelete = async () => {
+    if (!deleteConfig) return;
     setIsDeleting(true);
     try {
-      await batchDeleteBooks(Array.from(selectedBooks));
-      toast.success('Books removed from library');
+      if (deleteConfig.ids.length === 1 && deleteConfig.title === 'Delete Book?') {
+        await deleteUserBook(deleteConfig.ids[0]);
+      } else {
+        await batchDeleteBooks(deleteConfig.ids);
+      }
+      toast.success('Books moved to Trash');
       queryClient.invalidateQueries({ queryKey: ['library'] });
       setSelectedBooks(new Set());
+      setIsSelectionMode(false); // Exit selection mode after delete
+      setDeleteConfig(null);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  const gridClasses: Record<GridSize, string> = {
+    sm: "grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3",
+    md: "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6",
+    lg: "grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8"
   };
 
   return (
@@ -105,7 +157,7 @@ export default function Library() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-6 md:p-8">
+        <div className="flex-1 overflow-y-auto p-6 md:p-8 pb-32">
           <LibraryToolbar
             viewMode={viewMode} setViewMode={(v) => updateParam('view', v)}
             filterStatus={filterStatus} setFilterStatus={(s) => updateParam('status', s)}
@@ -114,14 +166,28 @@ export default function Library() {
             sortBy={sortBy} setSortBy={(s) => updateParam('sort', s)}
             groupBySeries={groupBySeries} setGroupBySeries={(g) => updateParam('group', g.toString())}
             onCreateSeries={() => setIsSeriesModalOpen(true)}
+            gridSize={gridSize} setGridSize={(s) => updateParam('size', s)}
+            ownership={ownership} setOwnership={(o) => updateParam('ownership', o)}
+            minRating={minRating} setMinRating={(r) => updateParam('rating', r)}
+            isSelectionMode={isSelectionMode} setIsSelectionMode={setIsSelectionMode} // 🔥 Pass to toolbar
           />
 
-          {books.length === 0 ? (
+          {isLoading ? (
+            <div className={`grid ${gridClasses[gridSize]} pb-20`}>
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div key={i} className="flex flex-col gap-3">
+                  <div className="aspect-[2/3] w-full bg-surface rounded-lg border border-border animate-pulse" />
+                  <div className="h-4 bg-surface rounded w-3/4 animate-pulse" />
+                  <div className="h-3 bg-surface rounded w-1/2 animate-pulse" />
+                </div>
+              ))}
+            </div>
+          ) : books.length === 0 ? (
             <EmptyState 
               icon={<BookOpen className="w-8 h-8" />}
               title="Your library is empty"
               description="Start building your collection by adding your first book."
-              action={{ label: "Add a Book", onClick: openAddModal }} // 🔥 Wired to global modal
+              action={{ label: "Add a Book", onClick: openAddModal }}
             />
           ) : groupBySeries ? (
             <div className="flex flex-col gap-6 pb-20">
@@ -130,33 +196,28 @@ export default function Library() {
               ))}
             </div>
           ) : viewMode === 'grid' ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 pb-20">
+            <div className={`grid ${gridClasses[gridSize]} pb-20`}>
               {filteredBooks.map((book, index) => (
-                <div key={book.id} className="relative group/select">
-                  <div className="absolute top-2 left-2 z-20 opacity-0 group-hover/select:opacity-100 transition-opacity">
-                    <input
-                      type="checkbox"
-                      checked={selectedBooks.has(book.id)}
-                      onChange={() => toggleSelection(book.id)}
-                      className="w-5 h-5 accent-primary cursor-pointer rounded-md shadow-sm"
-                    />
-                  </div>
-                  <div className={selectedBooks.has(book.id) ? "opacity-50 grayscale transition-all" : ""}>
-                    <BookCover 
-                      book={book} 
-                      index={index} 
-                      onClick={() => navigate(`/books/${book.id}`)} 
-                    />
-                  </div>
-                </div>
+                <BookCover 
+                  key={book.id}
+                  book={book} 
+                  index={index} 
+                  onClick={() => navigate(`/books/${book.id}`)} 
+                  onRequestDelete={handleIndividualDelete} 
+                  isSelected={selectedBooks.has(book.id)} 
+                  onToggleSelect={() => toggleSelection(book.id)} 
+                  isSelectionMode={isSelectionMode} // 🔥 Pass to cover
+                />
               ))}
             </div>
           ) : (
             <div className="flex flex-col gap-3 pb-20">
               {filteredBooks.map((book) => (
                 <div key={book.id} className="flex items-center gap-4">
-                  <input type="checkbox" checked={selectedBooks.has(book.id)} onChange={() => toggleSelection(book.id)} className="w-5 h-5 accent-primary" />
-                  <div className="flex-1" onClick={() => navigate(`/books/${book.id}?source=library`)}> 
+                  {isSelectionMode && (
+                    <input type="checkbox" checked={selectedBooks.has(book.id)} onChange={() => toggleSelection(book.id)} className="w-5 h-5 accent-primary" />
+                  )}
+                  <div className="flex-1" onClick={() => isSelectionMode ? toggleSelection(book.id) : navigate(`/books/${book.id}?source=library`)}> 
                     <BookListItem book={book} />
                   </div>
                 </div>
@@ -165,27 +226,46 @@ export default function Library() {
           )}
         </div>
 
-        {selectedBooks.size > 0 && (
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-surface border border-border shadow-2xl rounded-full px-6 py-3 flex items-center gap-6 animate-fade-up">
-            <span className="text-sm font-medium">{selectedBooks.size} selected</span>
-            <div className="h-4 w-px bg-border"></div>
-            <button onClick={() => setSelectedBooks(new Set())} className="text-sm text-text-muted hover:text-text">Cancel</button>
-            <button
-              onClick={handleBatchDelete}
-              disabled={isDeleting}
-              className="bg-red-500 text-white px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2 hover:bg-red-600 transition-colors disabled:opacity-50"
+        <AnimatePresence>
+          {selectedBooks.size > 0 && (
+            <motion.div 
+              initial={{ y: 100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 100, opacity: 0 }}
+              className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-surface/90 backdrop-blur-md border border-border shadow-2xl rounded-full px-4 py-2 flex items-center gap-4 z-50"
             >
-              <Trash2 className="w-4 h-4" />
-              {isDeleting ? 'Deleting...' : 'Delete Selected'}
-            </button>
-          </div>
-        )}
+              <button onClick={() => { setSelectedBooks(new Set()); setIsSelectionMode(false); }} className="p-2 hover:bg-bg rounded-full transition-colors text-text-muted">
+                <X className="w-5 h-5" />
+              </button>
+              <div className="h-6 w-px bg-border"></div>
+              <span className="text-sm font-medium px-2">{selectedBooks.size} selected</span>
+              <motion.button
+                whileTap={{ scale: 0.96 }}
+                onClick={handleBatchDelete}
+                disabled={isDeleting}
+                className="bg-red-500 text-white px-5 py-2 rounded-full text-sm font-medium flex items-center gap-2 hover:bg-red-600 transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </motion.button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
 
       <CreateSeriesModal 
         isOpen={isSeriesModalOpen} 
         onClose={() => setIsSeriesModalOpen(false)} 
         availableBooks={books} 
+      />
+
+      <ConfirmDialog 
+        isOpen={!!deleteConfig}
+        title={deleteConfig?.title || ''}
+        description={deleteConfig?.description || ''}
+        confirmLabel="Move to Trash"
+        onConfirm={executeDelete}
+        onCancel={() => setDeleteConfig(null)}
       />
     </div>
   );

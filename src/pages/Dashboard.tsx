@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Plus, ArrowRight, BookOpen, Flame } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { getMyLibrary } from '../api/library';
+import { getMyLibrary, getSessionStats } from '../api/library'; // 🔥 Import getSessionStats
 import { StatsRow } from '../components/StatsRow';
 import { ContinueReadingCard } from '../components/ContinueReadingCard';
 import { QuoteCard } from '../components/QuoteCard';
@@ -12,15 +12,23 @@ import { BookCover } from '../components/BookCover';
 import ThemeToggle from '../components/ThemeToggle';
 import { Sidebar } from '../components/Sidebar';
 import { useAuth } from '../context/AuthContext';
-import { useUI } from '../context/UIContext'; // 🔥 Imported useUI
+import { useUI } from '../context/UIContext';
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { openAddModal } = useUI(); // 🔥 Replaced local state
+  const { openAddModal } = useUI();
 
-  const { data: books = [], isLoading } = useQuery({
+  const { data: books = [], isLoading: booksLoading } = useQuery({
     queryKey: ['library'],
     queryFn: () => getMyLibrary(),
+    refetchOnMount: 'always',
+    staleTime: 0,
+  });
+
+  // 🔥 Fetch real session data
+  const { data: sessionStats = [], isLoading: statsLoading } = useQuery({
+    queryKey: ['sessionStats'],
+    queryFn: getSessionStats,
   });
 
   const readingBooks = useMemo(() => {
@@ -30,22 +38,16 @@ export default function Dashboard() {
   const continueReadingBook = readingBooks.length > 0 ? readingBooks[0] : null;
   const favouriteBooks = useMemo(() => books.filter(b => b.isFavourite), [books]);
 
-  // 🔥 Dynamic Yearly Goal Calculation
   const booksFinishedThisYear = useMemo(() => {
     const currentYear = new Date().getFullYear();
-    return books.filter(b => 
-      b.status === 'Finished' && 
-      new Date(b.addedAt).getFullYear() === currentYear
-    ).length;
+    return books.filter(b => b.status === 'Finished' && new Date(b.addedAt).getFullYear() === currentYear).length;
   }, [books]);
 
   const goalTarget = 24;
   const goalPercentage = Math.min(100, (booksFinishedThisYear / goalTarget) * 100);
 
-  // 🔥 The Insight Headline Logic
   const generateInsight = () => {
     const finishedThisYear = books.filter(b => b.status === 'Finished').length;
-    
     if (books.length === 0) return "Let's start building your library today.";
     if (finishedThisYear >= goalTarget) return "Incredible! You've hit your yearly goal. Time to set a new one?";
     if (finishedThisYear > 0) {
@@ -56,16 +58,21 @@ export default function Dashboard() {
     return "Ready to dive into a new world? Your books are waiting.";
   };
 
+  // 🔥 Convert real stats to the Heatmap's 0-4 intensity format
   const readingActivity = useMemo(() => {
     const activity: Record<string, number> = {};
-    books.forEach((book) => {
-      if (book.status === 'Reading' && book.currentPage > 0) {
-        const today = new Date().toISOString().split('T')[0];
-        activity[today] = Math.min(4, (activity[today] || 0) + 1);
-      }
+    sessionStats.forEach((stat) => {
+      // Intensity logic: 
+      // 1-10 pages = 1, 11-30 pages = 2, 31-50 pages = 3, 50+ pages = 4
+      let intensity = 1;
+      if (stat.pagesRead > 10) intensity = 2;
+      if (stat.pagesRead > 30) intensity = 3;
+      if (stat.pagesRead > 50) intensity = 4;
+      
+      activity[stat.date] = intensity;
     });
     return activity;
-  }, [books]);
+  }, [sessionStats]);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -79,24 +86,18 @@ export default function Dashboard() {
       <div className="flex-shrink-0 hidden md:block"><Sidebar /></div>
 
       <main className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
         <header className="h-20 border-b border-border bg-surface flex items-center justify-between px-6 md:px-8 gap-4 flex-shrink-0">
           <div className="flex flex-col">
             <h1 className="text-2xl font-serif font-bold text-text">
-              {getGreeting()}, {
-                user?.lastName 
-                  ? `${user.lastName}, ${user.firstName}` 
-                  : (user?.firstName || user?.displayName || 'Reader')
-              }
+              {getGreeting()}, {user?.lastName ? `${user.lastName}, ${user.firstName}` : (user?.firstName || user?.displayName || 'Reader')}
             </h1>
-            {/* 🔥 Insight Headline */}
             <p className="text-sm text-text-muted mt-1">{generateInsight()}</p>
           </div>
           <div className="flex items-center gap-4">
             <ThemeToggle />
             <motion.button
               whileTap={{ scale: 0.96 }}
-              onClick={openAddModal} // 🔥 Wired to global context
+              onClick={openAddModal}
               className="flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-xl hover:bg-primary-hover transition-all text-sm font-medium shadow-sm hover:shadow-md"
             >
               <Plus className="w-4 h-4" /> Add Book
@@ -105,17 +106,14 @@ export default function Dashboard() {
         </header>
 
         <div className="flex-1 overflow-y-auto p-6 md:p-8">
-          {isLoading ? (
+          {(booksLoading || statsLoading) ? (
              <div className="animate-pulse space-y-8">
                <div className="h-64 bg-surface rounded-2xl border border-border w-full"></div>
              </div>
           ) : (
             <div className="max-w-7xl mx-auto space-y-8 pb-12">
               
-              {/* Bento Top Section */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
-                {/* Left Col (Hero) */}
                 <div className="lg:col-span-2 space-y-6">
                   {continueReadingBook ? (
                     <ContinueReadingCard book={continueReadingBook} />
@@ -126,15 +124,12 @@ export default function Dashboard() {
                       <p className="text-sm text-text-muted mb-4">Start a new book to see it here.</p>
                     </div>
                   )}
-                  
                   <StatsRow books={books} onReadingClick={() => {}} />
                 </div>
 
-                {/* Right Col (Quote & Goal) */}
                 <div className="flex flex-col gap-6">
                   <QuoteCard />
                   
-                  {/* Reading Goal Card */}
                   <div className="bg-surface border border-border rounded-2xl p-6 flex flex-col justify-between">
                     <div>
                       <div className="flex items-center gap-2 mb-2">
@@ -161,7 +156,6 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Favourites Row */}
               {favouriteBooks.length > 0 && (
                 <div>
                   <div className="flex items-center justify-between mb-4">
@@ -180,12 +174,10 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* Heatmap */}
               <div>
                 <ReadingHeatmap activity={readingActivity} />
               </div>
               
-              {/* Bottom Action */}
               <div className="text-center pt-8">
                 <Link to="/library" className="inline-flex items-center gap-2 bg-surface border border-border px-6 py-3 rounded-xl font-medium hover:border-primary transition-colors text-text shadow-sm hover:shadow-md">
                   Browse Full Library <ArrowRight className="w-4 h-4" />

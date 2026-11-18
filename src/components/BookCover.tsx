@@ -1,17 +1,21 @@
 import { useState, type SyntheticEvent, useMemo } from 'react';
-import { BookOpen, Trash2, Heart } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { BookOpen, Trash2, Heart, MoreVertical, Check, Star } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { deleteUserBook, toggleFavourite } from '../api/library';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 import type { UserBook } from '../api/types';
-import { LanguageBadge } from './LanguageBadge'; // 🔥 Imported LanguageBadge
+import { LanguageBadge } from './LanguageBadge';
 
 interface Props {
   book: UserBook;
   onClick?: () => void;
   index?: number;
+  onRequestDelete?: (id: string, title: string) => void;
+  isSelected?: boolean;
+  onToggleSelect?: () => void;
+  isSelectionMode?: boolean; // 🔥 New Prop
 }
 
 const statusStyles: Record<string, string> = {
@@ -23,38 +27,18 @@ const statusStyles: Record<string, string> = {
 };
 
 const gradients = [
-  'from-indigo-500 to-purple-600',
-  'from-emerald-500 to-teal-600',
-  'from-rose-500 to-pink-600',
-  'from-amber-500 to-orange-600',
-  'from-blue-500 to-cyan-600',
+  'from-indigo-500 to-purple-600', 'from-emerald-500 to-teal-600',
+  'from-rose-500 to-pink-600', 'from-amber-500 to-orange-600', 'from-blue-500 to-cyan-600',
 ];
 
-export function BookCover({ book, onClick, index = 0 }: Props) {
+export function BookCover({ book, onClick, index = 0, onRequestDelete, isSelected, onToggleSelect, isSelectionMode }: Props) {
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
+  const [showMenu, setShowMenu] = useState(false);
   const showFallback = !book.coverUrl || imageError;
   
   const queryClient = useQueryClient();
   
-  // 🔥 Delete Mutation
-  const deleteMutation = useMutation({
-    mutationFn: () => deleteUserBook(book.id),
-    onSuccess: () => {
-      toast.success('Book removed from library');
-      queryClient.invalidateQueries({ queryKey: ['library'] });
-    },
-    onError: (err: any) => toast.error(err.message),
-  });
-
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation(); 
-    if (confirm(`Remove "${book.title}" from your library?`)) {
-      deleteMutation.mutate();
-    }
-  };
-
-  // 🔥 Favourite Mutation (Optimistic)
   const favouriteMutation = useMutation({
     mutationFn: () => toggleFavourite(book.id),
     onMutate: async () => {
@@ -71,9 +55,29 @@ export function BookCover({ book, onClick, index = 0 }: Props) {
     }
   });
 
+  // 🔥 Handle different click behaviors
+  const handleCardClick = (e: React.MouseEvent) => {
+    if (isSelectionMode) {
+      onToggleSelect?.();
+    } else {
+      onClick?.();
+    }
+  };
+
+  const handleSelect = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onToggleSelect?.();
+  };
+
   const handleFavourite = (e: React.MouseEvent) => {
     e.stopPropagation();
     favouriteMutation.mutate();
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowMenu(false);
+    if (onRequestDelete) onRequestDelete(book.id, book.title);
   };
 
   const gradientClass = useMemo(() => {
@@ -86,18 +90,39 @@ export function BookCover({ book, onClick, index = 0 }: Props) {
     setImageLoading(false);
   };
 
-  const primaryGenre = book.genres?.split(',')[0]?.trim();
-
   return (
     <motion.div
-      whileHover={{ y: -5 }}
+      whileHover={{ y: isSelectionMode ? 0 : -5 }} // Disable hover lift in selection mode
       whileTap={{ scale: 0.98 }}
-      onClick={onClick}
-      className="group cursor-pointer flex flex-col gap-3 animate-fade-up"
+      onClick={handleCardClick}
+      className={cn(
+        "group cursor-pointer flex flex-col gap-3 animate-fade-up relative",
+        isSelectionMode && "select-none"
+      )}
       style={{ animationDelay: `${index * 30}ms` }}
     >
-      <div className="relative aspect-[2/3] w-full rounded-lg overflow-hidden bg-surface border border-border shadow-sm transition-all duration-200">
+      <div className={cn(
+        "relative aspect-[2/3] w-full rounded-lg overflow-hidden bg-surface border-2 transition-all duration-200",
+        isSelected ? "border-primary shadow-lg" : "border-border shadow-sm"
+      )}>
         
+        {/* 🔥 Selection Circle (Only shows in Selection Mode) */}
+        {isSelectionMode && (
+          <div className="absolute top-2 left-2 z-30">
+            <button 
+              onClick={handleSelect}
+              className={cn(
+                "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
+                isSelected 
+                  ? "bg-primary border-primary text-white scale-110 shadow-md" 
+                  : "bg-black/40 border-white/70 text-transparent backdrop-blur-sm"
+              )}
+            >
+              <Check className="w-4 h-4" strokeWidth={3} />
+            </button>
+          </div>
+        )}
+
         {imageLoading && !showFallback && (
           <div className="absolute inset-0 bg-surface-hover animate-pulse" />
         )}
@@ -109,109 +134,94 @@ export function BookCover({ book, onClick, index = 0 }: Props) {
             onLoad={handleImageLoad}
             onError={() => setImageError(true)}
             className={cn(
-              'w-full h-full object-cover transition-opacity duration-300',
-              imageLoading ? 'opacity-0' : 'opacity-100'
+              'w-full h-full object-cover transition-opacity duration-300', 
+              imageLoading ? 'opacity-0' : 'opacity-100', 
+              isSelected && 'brightness-75'
             )}
           />
         )}
 
         {showFallback && (
-          <div className={cn("absolute inset-0 flex flex-col justify-between p-4 bg-gradient-to-br text-white", gradientClass)}>
-            <div className="opacity-50">
-              <BookOpen className="w-6 h-6" />
-            </div>
+          <div className={cn("absolute inset-0 flex flex-col justify-between p-4 bg-gradient-to-br text-white", gradientClass, isSelected && 'brightness-75')}>
+            <div className="opacity-50"><BookOpen className="w-6 h-6" /></div>
             <div className="flex-1 flex flex-col justify-center">
-              <h4 className="font-serif font-bold text-lg leading-tight line-clamp-4 drop-shadow-md">
-                {book.title}
-              </h4>
-              <p className="text-xs text-white/80 mt-2 line-clamp-2 uppercase tracking-wider font-medium">
-                {book.author}
-              </p>
+              <h4 className="font-serif font-bold text-lg leading-tight line-clamp-4 drop-shadow-md">{book.title}</h4>
+              <p className="text-xs text-white/80 mt-2 line-clamp-2 uppercase tracking-wider font-medium">{book.author}</p>
             </div>
-            <div className="text-[10px] text-white/50 uppercase tracking-widest text-right">
-              Spine
-            </div>
+            <div className="text-[10px] text-white/50 uppercase tracking-widest text-right">Spine</div>
           </div>
         )}
 
-        {/* 🔥 Language Badge (Bottom Left) */}
         <div className="absolute bottom-2 left-2 z-10">
           <LanguageBadge code={book.language} size="sm" />
         </div>
 
-        {/* Status Badge */}
-        <div className="absolute top-2 right-2">
-          <span className={cn(
-            'text-xs font-medium px-2 py-0.5 rounded-full backdrop-blur-sm',
-            statusStyles[book.status] || statusStyles.Unread
-          )}>
-            {book.status}
-          </span>
-        </div>
-
-                {/* Favourite Button (Only show if it's in the library) */}
-        {book.status && (
-          <div className="absolute bottom-2 right-2 z-20">
-            <button
-              onClick={handleFavourite}
-              className="bg-black/60 backdrop-blur-sm p-1.5 rounded-full text-white hover:bg-black/80 transition-colors"
-              title="Toggle Favourite"
-            >
-              <Heart className={cn("w-4 h-4", book.isFavourite ? 'fill-red-500 text-red-500' : '')} />
-            </button>
+        {book.status && !isSelectionMode && (
+          <div className="absolute top-2 right-2">
+            <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full backdrop-blur-sm', statusStyles[book.status] || statusStyles.Unread)}>
+              {book.status}
+            </span>
           </div>
         )}
 
-        {/* Delete Button (Visible on Hover) */}
-        {book.status && (
-          <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-            <button
-              onClick={handleDelete}
-              disabled={deleteMutation.isPending}
-              className="bg-black/60 hover:bg-red-500 backdrop-blur-sm p-1.5 rounded-full text-white transition-colors"
-              title="Remove from library"
-            >
-              {deleteMutation.isPending ? (
-                <span className="block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-              ) : (
-                <Trash2 className="w-4 h-4" />
-              )}
+        {/* Bottom Right Actions: Favourite & Menu (Hidden in Selection Mode) */}
+        {book.status && !isSelectionMode && (
+          <div className="absolute bottom-2 right-2 z-20 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onClick={handleFavourite} className="bg-black/60 backdrop-blur-sm p-1.5 rounded-full text-white hover:bg-black/80 transition-colors">
+              <Heart className={cn("w-4 h-4 transition-colors", book.isFavourite ? 'fill-red-500 text-red-500' : '')} />
             </button>
+            
+            <div className="relative">
+              <button 
+                onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }} 
+                className="bg-black/60 backdrop-blur-sm p-1.5 rounded-full text-white hover:bg-black/80 transition-colors"
+              >
+                <MoreVertical className="w-4 h-4" />
+              </button>
+              
+              <AnimatePresence>
+                {showMenu && (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.9, y: -10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                    className="absolute bottom-full right-0 mb-2 w-32 bg-surface border border-border rounded-xl shadow-xl overflow-hidden z-50"
+                  >
+                    <button onClick={handleDelete} className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-500/10 flex items-center gap-2">
+                      <Trash2 className="w-4 h-4" /> Delete
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         )}
 
-        {/* 🔥 Delete Button (Visible on Hover) */}
-        <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-          <button
-            onClick={handleDelete}
-            disabled={deleteMutation.isPending}
-            className="bg-black/60 hover:bg-red-500 backdrop-blur-sm p-1.5 rounded-full text-white transition-colors"
-            title="Remove from library"
-          >
-            {deleteMutation.isPending ? (
-              <span className="block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-            ) : (
-              <Trash2 className="w-4 h-4" />
-            )}
-          </button>
-        </div>
-
-        {/* Progress Bar */}
         {book.status === 'Reading' && book.totalPages && (
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/30">
-            <div
-              className="h-full bg-primary transition-all"
-              style={{ width: `${Math.min(100, (book.currentPage / book.totalPages) * 100)}%` }}
-            />
+            <div className="h-full bg-primary transition-all" style={{ width: `${Math.min(100, (book.currentPage / book.totalPages) * 100)}%` }} />
           </div>
         )}
       </div>
 
       <div className="flex flex-col">
-        <h3 className="font-serif font-semibold text-sm leading-snug line-clamp-2 group-hover:text-primary transition-colors">
-          {book.title}
-        </h3>
+        <h3 className="font-serif font-semibold text-sm leading-snug line-clamp-2 group-hover:text-primary transition-colors">{book.title}</h3>
         <p className="text-xs text-text-muted mt-1 line-clamp-1">{book.author}</p>
+        
+        {/* 🔥 Star Rating */}
+        {book.personalRating ? (
+          <div className="flex items-center gap-0.5 mt-1">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <Star 
+                key={star} 
+                className={cn(
+                  "w-3 h-3", 
+                  star <= (book.personalRating || 0) ? "fill-yellow-500 text-yellow-500" : "fill-transparent text-gray-400 dark:text-gray-600"
+                )} 
+              />
+            ))}
+          </div>
+        ) : null}
       </div>
     </motion.div>
   );

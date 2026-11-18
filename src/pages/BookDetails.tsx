@@ -1,11 +1,15 @@
 import { useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import { Sidebar } from '../components/Sidebar';
-import { ArrowLeft, Star, Heart, Share2, BookOpen, ShoppingCart, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Star, Heart, Share2, BookOpen, ShoppingCart, RefreshCw, Check, Trash2 } from 'lucide-react';
 import { LanguageBadge } from '../components/LanguageBadge';
 import { motion } from 'framer-motion';
+import { cn } from '../lib/utils';
+import { toast } from 'sonner';
+import { toggleFavourite, deleteUserBook } from '../api/library';
+import { StarRating } from '../components/StarRating'; // 🔥 Import the new component
 
 export default function BookDetails() {
   const { id } = useParams();
@@ -13,6 +17,7 @@ export default function BookDetails() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('overview');
+  const [imageError, setImageError] = useState(false);
 
   const initialBook = location.state?.book;
 
@@ -25,24 +30,103 @@ export default function BookDetails() {
     enabled: !!id,
     placeholderData: initialBook,
     staleTime: 0,
-    refetchOnMount: 'always',
   });
 
-  const genreList = typeof book?.genres === 'string' 
-    ? book.genres.split(',').map((g: string) => g.trim()).filter(Boolean) 
-    : (book?.genres || []);
+  const { data: library = [] } = useQuery({
+    queryKey: ['library'],
+    queryFn: () => apiClient.get('/api/UserBooks').then((r) => r.data),
+  });
 
+  const userBook = library.find((ub: any) => 
+    (book?.isbn && ub.isbn === book.isbn) || 
+    (ub.title?.toLowerCase() === book?.title?.toLowerCase() && ub.author?.toLowerCase() === book?.author?.toLowerCase())
+  );
+  const isInLibrary = !!userBook;
+
+  // 🔥 Mutations
+  const addMutation = useMutation({
+    mutationFn: async (ownership: string) => {
+      if (!book) return;
+      if (book.isbn) {
+        return apiClient.post('/api/UserBooks', { isbn: book.isbn, ownership });
+      }
+      return apiClient.post('/api/UserBooks/manual', {
+        title: book.title, author: book.author, isbn: book.isbn, coverUrl: book.coverUrl,
+        language: book.language, description: book.description, pageCount: book.pageCount,
+        seriesName: book.seriesName, seriesPosition: book.seriesPosition, genres: book.genres,
+        ownership // Pass to manual too
+      });
+    },
+    onSuccess: () => {
+      toast.success('Added to Library');
+      queryClient.invalidateQueries({ queryKey: ['library'] });
+      queryClient.invalidateQueries({ queryKey: ['book', id] });
+    }
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: any) => {
+      if (!userBook) return;
+      await apiClient.put(`/api/UserBooks/${userBook.id}`, {
+        status: userBook.status, currentPage: userBook.currentPage,
+        personalRating: userBook.personalRating, privateNotes: userBook.privateNotes,
+        lentTo: userBook.lentTo, ownership: userBook.ownership,
+        ...data // overwrite with new changes
+      });
+    },
+    onMutate: async (newData) => {
+      await queryClient.cancelQueries({ queryKey: ['library'] });
+      const previous = queryClient.getQueryData(['library']);
+      queryClient.setQueryData(['library'], (old: any) => 
+        old?.map((b: any) => b.id === userBook.id ? { ...b, ...newData } : b)
+      );
+      return { previous };
+    },
+    onError: (err, newData, context) => {
+      if (context?.previous) queryClient.setQueryData(['library'], context.previous);
+      toast.error('Failed to update');
+    }
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: async () => {
+      if (!userBook) return;
+      await deleteUserBook(userBook.id);
+    },
+    onSuccess: () => {
+      toast.success('Removed from Library');
+      queryClient.invalidateQueries({ queryKey: ['library'] });
+      navigate('/library');
+    }
+  });
+
+  const handleShare = async () => {
+    const shareData = { title: book.title, text: `Check out "${book.title}" on Spine!`, url: window.location.href };
+    try {
+      if (navigator.share) await navigator.share(shareData);
+      else { await navigator.clipboard.writeText(window.location.href); toast.success('Link copied!'); }
+    } catch (err) {}
+  };
+
+  const genreList = typeof book?.genres === 'string' ? book.genres.split(',').map((g: string) => g.trim()).filter(Boolean) : (book?.genres || []);
   const hasDescription = book?.description && book.description.trim().length > 0;
+  const gradients = ['from-indigo-500 to-purple-600', 'from-emerald-500 to-teal-600', 'from-rose-500 to-pink-600', 'from-amber-500 to-orange-600'];
+  const gradientClass = gradients[(book?.title?.charCodeAt(0) || 0) % gradients.length];
 
   return (
     <div className="min-h-screen flex bg-bg">
       <div className="flex-shrink-0 hidden md:block"><Sidebar /></div>
       
       <main className="flex-1 flex flex-col min-w-0">
-        <div className="p-6 md:p-8 flex items-center gap-4 border-b border-border bg-surface sticky top-0 z-20">
+        <div className="px-6 py-4 border-b border-border bg-surface sticky top-0 z-20 flex items-center gap-4">
           <button onClick={() => navigate(-1)} className="p-2 hover:bg-bg rounded-full flex items-center gap-2 text-text-muted hover:text-text transition-colors">
             <ArrowLeft className="w-5 h-5" /> Back
           </button>
+          <div className="w-px h-6 bg-border mx-2"></div>
+          <div>
+            <h1 className="text-xl font-serif font-bold text-text leading-tight">Book Details</h1>
+            <p className="text-xs text-text-muted">{book?.title || 'Loading...'}</p>
+          </div>
         </div>
 
         {isLoading && !book ? (
@@ -57,7 +141,7 @@ export default function BookDetails() {
         ) : (
           <div className="flex-1 overflow-y-auto">
             <div className="relative h-64 md:h-80 w-full overflow-hidden">
-              {book.coverUrl && (
+              {book.coverUrl && !imageError && (
                 <div className="absolute inset-0 opacity-30 blur-3xl scale-110" style={{ backgroundImage: `url(${book.coverUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/80 to-transparent" />
@@ -67,21 +151,45 @@ export default function BookDetails() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
                 
                 <div className="flex flex-col items-center md:items-start gap-6">
-                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-48 md:w-64 aspect-[2/3] rounded-xl overflow-hidden shadow-2xl border-4 border-surface relative">
-                    {book.coverUrl ? (
-                      <img src={book.coverUrl} alt={book.title} className="w-full h-full object-cover" />
+                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-48 md:w-64 aspect-[2/3] rounded-xl overflow-hidden shadow-2xl border-4 border-surface relative bg-surface">
+                    {book.coverUrl && !imageError ? (
+                      <img src={book.coverUrl} alt={book.title} onError={() => setImageError(true)} className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full bg-primary/10 flex items-center justify-center"><BookOpen className="w-12 h-12 text-primary/40" /></div>
+                      <div className={cn("w-full h-full flex flex-col items-center justify-center p-4 text-white bg-gradient-to-br", gradientClass)}>
+                        <BookOpen className="w-10 h-10 mb-4 opacity-50" />
+                        <p className="font-serif font-bold text-center line-clamp-4">{book.title}</p>
+                      </div>
                     )}
                     <div className="absolute bottom-3 left-3"><LanguageBadge code={book.language || 'en'} size="md" /></div>
                   </motion.div>
                   
-                  <div className="flex gap-2 w-full md:w-64">
-                    <button className="flex-1 bg-primary text-white py-3 rounded-xl font-medium hover:bg-primary-hover transition-colors shadow-sm">
-                      {book.status ? 'Update Status' : 'Add to Library'}
-                    </button>
-                    <button className="p-3 border border-border rounded-xl bg-surface hover:bg-bg shadow-sm"><Heart className="w-5 h-5 text-text-muted" /></button>
-                    <button className="p-3 border border-border rounded-xl bg-surface hover:bg-bg shadow-sm"><Share2 className="w-5 h-5 text-text-muted" /></button>
+                  {/* Action Bar */}
+                  <div className="flex flex-col gap-2 w-full md:w-64">
+                    {isInLibrary ? (
+                      <div className="flex gap-2">
+                        <button onClick={() => { if(confirm(`Remove "${book.title}"?`)) removeMutation.mutate(); }} disabled={removeMutation.isPending} className="flex-1 bg-red-500/10 text-red-500 border border-red-500/20 py-3 rounded-xl font-medium hover:bg-red-500/20 transition-colors shadow-sm flex items-center justify-center gap-2 disabled:opacity-50">
+                          {removeMutation.isPending ? 'Removing...' : <><Trash2 className="w-4 h-4" /> Remove</>}
+                        </button>
+                        <button onClick={() => { updateMutation.mutate({ isFavourite: !userBook.isFavourite }); }} className="p-3 border border-border rounded-xl bg-surface hover:bg-bg shadow-sm transition-colors">
+                          <Heart className={cn("w-5 h-5 transition-colors", userBook.isFavourite ? "fill-red-500 text-red-500" : "text-text-muted")} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button onClick={() => addMutation.mutate('Owned')} disabled={addMutation.isPending} className="flex-1 bg-primary text-white py-3 rounded-xl font-medium hover:bg-primary-hover transition-colors shadow-sm disabled:opacity-50">
+                          {addMutation.isPending ? 'Adding...' : 'Add to Library'}
+                        </button>
+                        <button onClick={() => addMutation.mutate('Wishlist')} disabled={addMutation.isPending} className="flex-1 bg-surface border border-border text-text py-3 rounded-xl font-medium hover:border-primary transition-colors shadow-sm disabled:opacity-50">
+                          + Wishlist
+                        </button>
+                      </div>
+                    )}
+                    
+                    <div className="flex gap-2">
+                       <button onClick={handleShare} className="flex-1 p-3 border border-border rounded-xl bg-surface hover:bg-bg shadow-sm flex items-center justify-center gap-2 text-sm font-medium">
+                         <Share2 className="w-4 h-4 text-text-muted" /> Share
+                       </button>
+                    </div>
                   </div>
                 </div>
 
@@ -98,9 +206,20 @@ export default function BookDetails() {
                   )}
 
                   <div className="flex items-center gap-6 text-sm text-text-muted bg-surface p-3 rounded-xl border border-border w-fit">
-                    <span className="flex items-center gap-1 font-medium"><Star className="w-4 h-4 fill-yellow-500 text-yellow-500" /> No ratings</span>
+                    {/* 🔥 Interactive Rating */}
+                    <div className="flex items-center gap-2">
+                      <StarRating 
+                        rating={userBook?.personalRating} 
+                        readonly={!isInLibrary} 
+                        size="md"
+                        onRatingChange={(r) => updateMutation.mutate({ personalRating: r })} 
+                      />
+                      <span className="text-xs font-medium">
+                        {userBook?.personalRating ? `${userBook.personalRating}.0` : 'Rate'}
+                      </span>
+                    </div>
                     <span className="w-px h-4 bg-border"></span>
-                    <span className="font-medium">{book.pageCount || book.totalPages ? `${book.pageCount || book.totalPages} pages` : 'Page count unknown'}</span>
+                    <span className="font-medium">{book.pageCount || book.totalPages ? `${book.pageCount || book.totalPages} pages` : 'Unknown'}</span>
                   </div>
 
                   <div className="flex border-b border-border mt-8 gap-6">
@@ -114,18 +233,12 @@ export default function BookDetails() {
                   <div className="pt-4">
                     {activeTab === 'overview' && (
                       <div className="space-y-6">
-                        
-                        {/* 🔥 Fallback UI for missing descriptions */}
                         {!hasDescription ? (
                           <div className="bg-surface border border-border rounded-xl p-6 text-center">
                             <p className="text-sm text-text-muted mb-4">No description available.</p>
-                            <button 
-                              onClick={() => refetch()} 
-                              disabled={isFetching}
-                              className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-                            >
+                            <button onClick={() => refetch()} disabled={isFetching} className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline">
                               <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
-                              {isFetching ? 'Fetching from APIs...' : 'Try fetching description again'}
+                              {isFetching ? 'Fetching...' : 'Try again'}
                             </button>
                           </div>
                         ) : (
@@ -139,28 +252,24 @@ export default function BookDetails() {
                             ))}
                           </div>
                         )}
-
-                        <div className="pt-6 border-t border-border flex gap-4">
-                          <a href={`https://www.amazon.in/s?k=${book.isbn || book.title}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm font-medium text-primary hover:underline bg-primary/5 px-4 py-2 rounded-lg">
-                            <ShoppingCart className="w-4 h-4" /> Buy on Amazon
-                          </a>
-                          <a href={`https://www.flipkart.com/search?q=${book.isbn || book.title}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm font-medium text-primary hover:underline bg-primary/5 px-4 py-2 rounded-lg">
-                            <ShoppingCart className="w-4 h-4" /> Buy on Flipkart
-                          </a>
-                        </div>
                       </div>
                     )}
                     
                     {activeTab === 'reviews' && (
                       <div className="text-center py-12 text-text-muted bg-surface/50 rounded-xl border border-border">
-                        <p className="text-sm">No reviews yet. Be the first to review!</p>
+                        <p className="text-sm">No reviews yet.</p>
                       </div>
                     )}
 
                     {activeTab === 'notes' && (
                       <div>
-                        <textarea placeholder="Write your private notes here..." className="w-full h-40 p-4 bg-surface border border-border rounded-xl focus:ring-4 focus:ring-primary/15 text-sm resize-none" defaultValue={book.privateNotes || ''} />
-                        <p className="text-xs text-text-muted mt-2">Auto-saves as you type.</p>
+                        <textarea 
+                          placeholder="Write your private notes here..." 
+                          className="w-full h-40 p-4 bg-surface border border-border rounded-xl focus:ring-4 focus:ring-primary/15 text-sm resize-none" 
+                          defaultValue={book.privateNotes || ''} 
+                          onBlur={(e) => isInLibrary && updateMutation.mutate({ privateNotes: e.target.value })}
+                        />
+                        <p className="text-xs text-text-muted mt-2">Auto-saves on blur.</p>
                       </div>
                     )}
                   </div>

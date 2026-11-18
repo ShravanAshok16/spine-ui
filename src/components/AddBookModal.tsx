@@ -13,6 +13,51 @@ interface Props {
   onClose: () => void;
 }
 
+// 🔥 Helper component to handle broken image links in search results
+function SearchResultCover({ coverUrl, title, author }: { coverUrl: string | null; title: string; author: string }) {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
+  const showFallback = !coverUrl || imageError;
+
+  const gradients = [
+    'from-indigo-500 to-purple-600', 'from-emerald-500 to-teal-600', 
+    'from-rose-500 to-pink-600', 'from-amber-500 to-orange-600'
+  ];
+  const gradientClass = gradients[(title.charCodeAt(0) || 0) % gradients.length];
+
+  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    if (e.currentTarget.naturalWidth < 10) setImageError(true); // Catch 1x1 pixels
+    setImageLoading(false);
+  };
+
+  return (
+    <div className="aspect-[2/3] w-full relative bg-surface">
+      {imageLoading && !showFallback && (
+        <div className="absolute inset-0 bg-surface-hover animate-pulse" />
+      )}
+      
+      {!showFallback && (
+        <img
+          src={coverUrl}
+          alt={title}
+          onLoad={handleImageLoad}
+          onError={() => setImageError(true)}
+          className={cn("w-full h-full object-cover transition-opacity duration-300", imageLoading ? 'opacity-0' : 'opacity-100')}
+        />
+      )}
+
+      {showFallback && (
+        <div className={cn("absolute inset-0 flex flex-col justify-between p-2 bg-gradient-to-br text-white", gradientClass)}>
+          <BookOpen className="w-4 h-4 opacity-50" />
+          <div className="flex-1 flex items-center justify-center text-center">
+            <span className="text-[10px] font-serif font-bold leading-tight line-clamp-3">{title}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AddBookModal({ isOpen, onClose }: Props) {
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -20,20 +65,16 @@ export function AddBookModal({ isOpen, onClose }: Props) {
   const [results, setResults] = useState<BookSearchResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  
-  // Manual Entry State
+
   const [isManualMode, setIsManualMode] = useState(false);
-  const [manualData, setManualData] = useState({ 
-    title: '', author: '', language: 'en', pageCount: '', 
-    genres: '', description: '', seriesName: '', seriesPosition: '' 
-  });
+  const [manualData, setManualData] = useState({ title: '', author: '', language: 'en', pageCount: '', genres: '', description: '' });
 
   const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!isOpen) {
       setQuery(''); setResults([]); setSelectedIds(new Set()); setHasSearched(false); setIsManualMode(false);
-      setManualData({ title: '', author: '', language: 'en', pageCount: '', genres: '', description: '', seriesName: '', seriesPosition: '' });
+      setManualData({ title: '', author: '', language: 'en', pageCount: '', genres: '', description: '' });
     }
   }, [isOpen]);
 
@@ -51,7 +92,7 @@ export function AddBookModal({ isOpen, onClose }: Props) {
     try {
       const data = await searchExternalBooks(query);
       setResults(data);
-    } catch { toast.error('Failed to search books'); } 
+    } catch { toast.error('Failed to search books'); }
     finally { setIsSearching(false); }
   };
 
@@ -62,7 +103,7 @@ export function AddBookModal({ isOpen, onClose }: Props) {
       toast.success('Book added successfully!');
       queryClient.invalidateQueries({ queryKey: ['library'] });
       onClose();
-    } catch (err: any) { toast.error(err.message || 'Failed to find book by ISBN'); } 
+    } catch (err: any) { toast.error(err.message || 'Failed to find book by ISBN'); }
     finally { setIsAdding(false); }
   };
 
@@ -78,29 +119,17 @@ export function AddBookModal({ isOpen, onClose }: Props) {
     setIsAdding(true);
     try {
       const booksToAdd = results.filter(b => selectedIds.has(b.isbn || `${b.title}-${b.author}`));
-      await Promise.all(booksToAdd.map(book => {
-  // 🔥 FIX: Handle Genres (Array vs String) and ensure no undefined fields
-        const safeGenres = Array.isArray(book.genres) 
-          ? book.genres.join(', ') 
-          : (book.genres || null);
-            
-        return apiClient.post('/api/UserBooks/manual', {
-          title: book.title,
-          author: book.author || 'Unknown Author',
-          isbn: book.isbn || null,
-          description: book.description || null,
-          pageCount: book.pageCount || null,
-          genres: safeGenres,
-          language: book.language || 'en',
-          coverUrl: book.coverUrl || null,
-          seriesName: book.seriesName || null,
-          seriesPosition: book.seriesPosition || null
-        });
-      }));
+      await Promise.all(booksToAdd.map(book =>
+        apiClient.post('/api/UserBooks/manual', {
+          title: book.title, author: book.author, isbn: book.isbn, description: book.description,
+          pageCount: book.pageCount, genres: Array.isArray(book.genres) ? book.genres.join(', ') : book.genres, 
+          language: book.language, coverUrl: book.coverUrl, seriesName: book.seriesName, seriesPosition: book.seriesPosition
+        })
+      ));
       toast.success(`${booksToAdd.length} book${booksToAdd.length > 1 ? 's' : ''} added!`);
       queryClient.invalidateQueries({ queryKey: ['library'] });
       onClose();
-    } catch (err: any) { toast.error(err.message || 'Failed to add some books'); } 
+    } catch (err: any) { toast.error(err.message || 'Failed to add some books'); }
     finally { setIsAdding(false); }
   };
 
@@ -108,15 +137,11 @@ export function AddBookModal({ isOpen, onClose }: Props) {
     e.preventDefault();
     setIsAdding(true);
     try {
-      await apiClient.post('/api/UserBooks/manual', { 
-        ...manualData, 
-        pageCount: manualData.pageCount ? parseInt(manualData.pageCount) : null,
-        seriesPosition: manualData.seriesPosition ? parseInt(manualData.seriesPosition) : null
-      });
+      await apiClient.post('/api/UserBooks/manual', { ...manualData, pageCount: manualData.pageCount ? parseInt(manualData.pageCount) : null });
       toast.success('Book added manually!');
       queryClient.invalidateQueries({ queryKey: ['library'] });
       onClose();
-    } catch (err: any) { toast.error(err.message || 'Failed to add book'); } 
+    } catch (err: any) { toast.error(err.message || 'Failed to add book'); }
     finally { setIsAdding(false); }
   };
 
@@ -127,10 +152,10 @@ export function AddBookModal({ isOpen, onClose }: Props) {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40" />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 400, damping: 25 }}
               className="w-full max-w-3xl bg-surface rounded-2xl shadow-2xl border border-border overflow-hidden pointer-events-auto flex flex-col max-h-[90vh]"
             >
               <div className="p-6 border-b border-border flex items-center justify-between">
@@ -158,21 +183,14 @@ export function AddBookModal({ isOpen, onClose }: Props) {
               <div className="flex-1 overflow-y-auto p-6 relative">
                 {isManualMode && (
                   <form onSubmit={handleManualSubmit} className="space-y-4 max-w-lg mx-auto">
-                    <div><label className="block text-sm font-medium mb-1.5">Title</label><input type="text" required value={manualData.title} onChange={e => setManualData({...manualData, title: e.target.value})} className="w-full px-4 py-3 border border-border rounded-xl bg-bg" /></div>
-                    <div><label className="block text-sm font-medium mb-1.5">Author</label><input type="text" required value={manualData.author} onChange={e => setManualData({...manualData, author: e.target.value})} className="w-full px-4 py-3 border border-border rounded-xl bg-bg" /></div>
-                    
-                    {/* 🔥 SERIES FIELDS ADDED HERE */}
+                    <div><label className="block text-sm font-medium mb-1.5">Title</label><input type="text" required value={manualData.title} onChange={e => setManualData({ ...manualData, title: e.target.value })} className="w-full px-4 py-3 border border-border rounded-xl bg-bg" /></div>
+                    <div><label className="block text-sm font-medium mb-1.5">Author</label><input type="text" required value={manualData.author} onChange={e => setManualData({ ...manualData, author: e.target.value })} className="w-full px-4 py-3 border border-border rounded-xl bg-bg" /></div>
                     <div className="grid grid-cols-2 gap-4">
-                      <div><label className="block text-sm font-medium mb-1.5">Series Name (Optional)</label><input type="text" value={manualData.seriesName} onChange={e => setManualData({...manualData, seriesName: e.target.value})} className="w-full px-4 py-3 border border-border rounded-xl bg-bg" placeholder="e.g. The Inheritance Cycle" /></div>
-                      <div><label className="block text-sm font-medium mb-1.5">Book # in Series</label><input type="number" value={manualData.seriesPosition} onChange={e => setManualData({...manualData, seriesPosition: e.target.value})} className="w-full px-4 py-3 border border-border rounded-xl bg-bg" placeholder="e.g. 2" /></div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div><label className="block text-sm font-medium mb-1.5">Language</label><select value={manualData.language} onChange={e => setManualData({...manualData, language: e.target.value})} className="w-full px-4 py-3 border border-border rounded-xl bg-bg"><option value="en">English</option><option value="kn">Kannada</option><option value="te">Telugu</option><option value="ta">Tamil</option></select></div>
-                      <div><label className="block text-sm font-medium mb-1.5">Pages</label><input type="number" value={manualData.pageCount} onChange={e => setManualData({...manualData, pageCount: e.target.value})} className="w-full px-4 py-3 border border-border rounded-xl bg-bg" /></div>
+                      <div><label className="block text-sm font-medium mb-1.5">Language</label><select value={manualData.language} onChange={e => setManualData({ ...manualData, language: e.target.value })} className="w-full px-4 py-3 border border-border rounded-xl bg-bg"><option value="en">English</option><option value="kn">Kannada</option><option value="te">Telugu</option><option value="ta">Tamil</option></select></div>
+                      <div><label className="block text-sm font-medium mb-1.5">Pages</label><input type="number" value={manualData.pageCount} onChange={e => setManualData({ ...manualData, pageCount: e.target.value })} className="w-full px-4 py-3 border border-border rounded-xl bg-bg" /></div>
                     </div>
                     <motion.button whileTap={{ scale: 0.97 }} type="submit" disabled={isAdding} className="w-full bg-primary text-white py-3 rounded-xl font-medium mt-4 flex justify-center items-center gap-2">
-                       {isAdding ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />} Add to Library
+                      {isAdding ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />} Add to Library
                     </motion.button>
                   </form>
                 )}
@@ -184,13 +202,15 @@ export function AddBookModal({ isOpen, onClose }: Props) {
                       const isSelected = selectedIds.has(id);
                       return (
                         <div key={i} onClick={() => toggleSelection(book)} className={cn("group cursor-pointer border rounded-lg overflow-hidden transition-all bg-bg flex flex-col relative", isSelected ? "border-primary ring-2 ring-primary/20 shadow-md" : "border-border hover:border-primary/50")}>
-                          <div className="aspect-[2/3] w-full relative bg-surface">
-                            {book.coverUrl ? <img src={book.coverUrl} alt={book.title} className="w-full h-full object-cover" /> : <div className="absolute inset-0 flex items-center justify-center bg-primary/10 p-2 text-center"><span className="text-xs text-text-muted">{book.title}</span></div>}
-                            <div className={cn("absolute inset-0 flex items-center justify-center transition-colors", isSelected ? "bg-primary/20" : "bg-transparent group-hover:bg-black/10")}>
-                              {isSelected && <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="bg-primary text-white rounded-full p-2 shadow-lg"><Check className="w-5 h-5" /></motion.div>}
-                            </div>
+                          
+                          {/* 🔥 USED THE NEW HELPER COMPONENT HERE */}
+                          <SearchResultCover coverUrl={book.coverUrl} title={book.title} author={book.author} />
+
+                          <div className={cn("absolute inset-0 flex items-center justify-center transition-colors", isSelected ? "bg-primary/20" : "bg-transparent group-hover:bg-black/10")}>
+                            {isSelected && <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="bg-primary text-white rounded-full p-2 shadow-lg"><Check className="w-5 h-5" /></motion.div>}
                           </div>
-                          <div className="p-3"><h4 className="font-serif font-semibold text-sm line-clamp-1">{book.title}</h4><p className="text-xs text-text-muted line-clamp-1 mt-1">{book.author}</p></div>
+                          
+                          <div className="p-3 border-t border-border"><h4 className="font-serif font-semibold text-sm line-clamp-1">{book.title}</h4><p className="text-xs text-text-muted line-clamp-1 mt-1">{book.author}</p></div>
                         </div>
                       );
                     })}
@@ -202,7 +222,7 @@ export function AddBookModal({ isOpen, onClose }: Props) {
                     <BookOpen className="w-12 h-12 text-text-muted/50 mx-auto mb-4" />
                     <h3 className="text-lg font-medium mb-1">No results found</h3>
                     <p className="text-sm text-text-muted mb-6">We couldn't find "{query}" in our database.</p>
-                    <button onClick={() => { setManualData({...manualData, title: query}); setIsManualMode(true); }} className="bg-primary/10 text-primary px-6 py-2.5 rounded-xl font-medium hover:bg-primary/20 transition-colors">Add Manually</button>
+                    <button onClick={() => { setManualData({ ...manualData, title: query }); setIsManualMode(true); }} className="bg-primary/10 text-primary px-6 py-2.5 rounded-xl font-medium hover:bg-primary/20 transition-colors">Add Manually</button>
                   </div>
                 )}
               </div>

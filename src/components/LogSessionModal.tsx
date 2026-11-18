@@ -11,22 +11,19 @@ interface Props {
   onClose: () => void;
 }
 
+// 🔥 FIX: Ensure this is a NAMED export
 export function LogSessionModal({ book, onClose }: Props) {
   const [pages, setPages] = useState('');
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
     mutationFn: async (pagesRead: number) => {
-      // 1. Update progress
-      const newPage = Math.min(book.currentPage + pagesRead, book.totalPages || 9999);
-      await apiClient.patch(`/api/UserBooks/${book.id}/progress`, { currentPage: newPage });
-      
-      // 2. Log session to backend (endpoint built in Hour 1)
       await apiClient.post(`/api/UserBooks/${book.id}/sessions`, { pagesRead });
     },
     onSuccess: () => {
       toast.success(`Logged ${pages} pages!`);
       queryClient.invalidateQueries({ queryKey: ['library'] });
+      queryClient.invalidateQueries({ queryKey: ['sessionStats'] });
       onClose();
     },
     onError: () => toast.error("Failed to log session")

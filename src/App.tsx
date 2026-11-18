@@ -16,7 +16,6 @@ import BookDetails from './pages/BookDetails';
 import ForYou from './pages/ForYou';
 import type { ReactNode } from 'react';
 
-// Global Modals Component
 function GlobalModals() {
   const { isAddModalOpen, closeAddModal } = useUI();
   return <AddBookModal isOpen={isAddModalOpen} onClose={closeAddModal} />;

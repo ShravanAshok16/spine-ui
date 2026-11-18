@@ -32,3 +32,13 @@ export async function updateProgress(id: string, currentPage: number): Promise<{
 export async function linkSeries(seriesName: string, bookIds: string[]): Promise<void> {
   await apiClient.post('/api/UserBooks/link-series', { seriesName, bookIds });
 }
+
+export async function getSessionStats(): Promise<{ date: string; pagesRead: number }[]> {
+  const { data } = await apiClient.get('/api/UserBooks/sessions/stats');
+  // The backend returns [{ Date: 'YYYY-MM-DD', PagesRead: 10 }]
+  // We map it to a cleaner camelCase format for the frontend
+  return data.map((item: any) => ({
+    date: item.date || item.Date,
+    pagesRead: item.pagesRead || item.PagesRead
+  }));
+}

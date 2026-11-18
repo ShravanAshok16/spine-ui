@@ -1,10 +1,11 @@
-import { LayoutGrid, List, ChevronDown, Library } from 'lucide-react';
+import { LayoutGrid, List, ChevronDown, Library, Grid2X2, Grid3X3, CheckSquare } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '../lib/utils';
 
 export type ViewMode = 'grid' | 'list';
 export type FilterStatus = 'All' | 'Reading' | 'Paused' | 'Finished' | 'Unread' | 'DNF';
 export type SortOption = 'newest' | 'title' | 'author' | 'rating';
+export type GridSize = 'sm' | 'md' | 'lg';
 
 interface Props {
   viewMode: ViewMode;
@@ -21,7 +22,16 @@ interface Props {
   setSortBy: (sort: SortOption) => void;
   groupBySeries: boolean;
   setGroupBySeries: (val: boolean) => void;
-  onCreateSeries?: () => void; // 🔥 Added this
+  onCreateSeries?: () => void;
+  gridSize: GridSize;
+  setGridSize: (size: GridSize) => void;
+  ownership: string;
+  setOwnership: (val: string) => void;
+  minRating: string;
+  setMinRating: (val: string) => void;
+  // 🔥 New Props
+  isSelectionMode: boolean;
+  setIsSelectionMode: (val: boolean) => void;
 }
 
 export function LibraryToolbar({
@@ -29,7 +39,8 @@ export function LibraryToolbar({
   languages, selectedLanguage, setSelectedLanguage,
   genres, selectedGenre, setSelectedGenre,
   sortBy, setSortBy, groupBySeries, setGroupBySeries,
-  onCreateSeries
+  onCreateSeries, gridSize, setGridSize, ownership, setOwnership, minRating, setMinRating,
+  isSelectionMode, setIsSelectionMode
 }: Props) {
   const statuses: FilterStatus[] = ['All', 'Reading', 'Paused', 'Finished', 'Unread', 'DNF'];
   const sortOptions: { value: SortOption; label: string }[] = [
@@ -42,11 +53,9 @@ export function LibraryToolbar({
   return (
     <div className="flex flex-col gap-4 mb-6 w-full">
       
-      {/* Row 1: Status Pills & View Controls */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         
-        {/* Status Pills */}
-        <div className="flex items-center gap-1 overflow-x-auto overflow-y-hidden pb-2 lg:pb-0 w-full lg:w-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <div className="flex items-center gap-1 overflow-x-auto pb-2 lg:pb-0 w-full lg:w-auto no-scrollbar">
           {statuses.map((status) => (
             <button
               key={status}
@@ -68,9 +77,21 @@ export function LibraryToolbar({
           ))}
         </div>
 
-        {/* Right side controls (Group, Grid/List, Create) */}
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-          
+          {/* 🔥 Selection Mode Toggle */}
+          <button
+            onClick={() => setIsSelectionMode(!isSelectionMode)}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border',
+              isSelectionMode 
+                ? 'bg-primary text-white border-primary shadow-sm' 
+                : 'bg-surface text-text-muted hover:text-text border-border'
+            )}
+          >
+            <CheckSquare className="w-4 h-4" />
+            {isSelectionMode ? 'Cancel Selection' : 'Select'}
+          </button>
+
           <button
             onClick={() => setGroupBySeries(!groupBySeries)}
             className={cn(
@@ -82,25 +103,25 @@ export function LibraryToolbar({
             Group by Series
           </button>
 
+          {viewMode === 'grid' && (
+            <div className="flex items-center bg-surface border border-border rounded-lg p-1 shadow-sm">
+              <button onClick={() => setGridSize('sm')} className={cn('p-1.5 rounded-md transition-colors', gridSize === 'sm' ? 'bg-bg text-primary shadow-sm' : 'text-text-muted hover:text-text')}>
+                <Grid2X2 className="w-4 h-4" />
+              </button>
+              <button onClick={() => setGridSize('md')} className={cn('p-1.5 rounded-md transition-colors', gridSize === 'md' ? 'bg-bg text-primary shadow-sm' : 'text-text-muted hover:text-text')}>
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button onClick={() => setGridSize('lg')} className={cn('p-1.5 rounded-md transition-colors', gridSize === 'lg' ? 'bg-bg text-primary shadow-sm' : 'text-text-muted hover:text-text')}>
+                <Grid3X3 className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
           <div className="flex items-center bg-surface border border-border rounded-lg p-1 shadow-sm">
-            <motion.button
-              whileTap={{ scale: 0.9 }}
-              onClick={() => setViewMode('grid')}
-              className={cn(
-                'p-1.5 rounded-md transition-colors',
-                viewMode === 'grid' ? 'bg-bg text-primary shadow-sm' : 'text-text-muted hover:text-text'
-              )}
-            >
+            <motion.button whileTap={{ scale: 0.9 }} onClick={() => setViewMode('grid')} className={cn('p-1.5 rounded-md transition-colors', viewMode === 'grid' ? 'bg-bg text-primary shadow-sm' : 'text-text-muted hover:text-text')}>
               <LayoutGrid className="w-4 h-4" />
             </motion.button>
-            <motion.button
-              whileTap={{ scale: 0.9 }}
-              onClick={() => setViewMode('list')}
-              className={cn(
-                'p-1.5 rounded-md transition-colors',
-                viewMode === 'list' ? 'bg-bg text-primary shadow-sm' : 'text-text-muted hover:text-text'
-              )}
-            >
+            <motion.button whileTap={{ scale: 0.9 }} onClick={() => setViewMode('list')} className={cn('p-1.5 rounded-md transition-colors', viewMode === 'list' ? 'bg-bg text-primary shadow-sm' : 'text-text-muted hover:text-text')}>
               <List className="w-4 h-4" />
             </motion.button>
           </div>
@@ -108,7 +129,7 @@ export function LibraryToolbar({
           {onCreateSeries && (
             <button
               onClick={onCreateSeries}
-              className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-hover transition-colors shadow-sm"
+              className="flex items-center gap-2 bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-hover transition-colors shadow-sm ml-auto lg:ml-0"
             >
               + Create Series
             </button>
@@ -116,8 +137,28 @@ export function LibraryToolbar({
         </div>
       </div>
 
-      {/* Row 2: Dropdown Filters */}
       <div className="flex flex-wrap items-center gap-3 border-t border-border/50 pt-4">
+        <div className="relative">
+          <select value={ownership} onChange={(e) => setOwnership(e.target.value)} className="appearance-none bg-surface border border-border text-sm rounded-lg pl-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer shadow-sm text-text-muted hover:text-text transition-colors">
+            <option value="All">Any Ownership</option>
+            <option value="Owned">Owned</option>
+            <option value="Wishlist">Wishlist</option>
+            <option value="LentOut">Lent Out</option>
+            <option value="Sold">Sold / Donated</option>
+          </select>
+          <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
+        </div>
+
+        <div className="relative">
+          <select value={minRating} onChange={(e) => setMinRating(e.target.value)} className="appearance-none bg-surface border border-border text-sm rounded-lg pl-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary cursor-pointer shadow-sm text-text-muted hover:text-text transition-colors">
+            <option value="All">Any Rating</option>
+            <option value="5">5 Stars</option>
+            <option value="4">4+ Stars</option>
+            <option value="3">3+ Stars</option>
+          </select>
+          <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
+        </div>
+
         <div className="relative">
           <select
             value={selectedLanguage}
