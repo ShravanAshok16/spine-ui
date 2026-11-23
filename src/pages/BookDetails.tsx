@@ -3,14 +3,15 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../api/client';
 import { Sidebar } from '../components/Sidebar';
-import { ArrowLeft, Star, Heart, Share2, BookOpen, ShoppingCart, RefreshCw, Check, Trash2 } from 'lucide-react';
+import { ArrowLeft, Heart, Share2, BookOpen, RefreshCw, Trash2, PenLine, TrendingUp } from 'lucide-react';
 import { LanguageBadge } from '../components/LanguageBadge';
 import { motion } from 'framer-motion';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
-import { toggleFavourite, deleteUserBook } from '../api/library';
+import { deleteUserBook } from '../api/library';
 import { StarRating } from '../components/StarRating';
-import { ReviewsSection } from '../components/ReviewsSection'; // 🔥 Import the new component
+import { ReviewsSection } from '../components/ReviewsSection';
+import { LogSessionModal } from '../components/LogSessionModal';
 
 export default function BookDetails() {
   const { id } = useParams();
@@ -19,6 +20,7 @@ export default function BookDetails() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('overview');
   const [imageError, setImageError] = useState(false);
+  const [isLogSessionOpen, setIsLogSessionOpen] = useState(false);
 
   const initialBook = location.state?.book;
 
@@ -44,7 +46,14 @@ export default function BookDetails() {
   );
   const isInLibrary = !!userBook;
 
-  // 🔥 Mutations
+  // 🔥 Fix the ID: Use the global BookId for reviews, not the UserBookId
+  const globalBookId = userBook?.bookId || book?.id || id || '';
+
+  // 🔥 Progress Calculation
+  const totalPages = book?.pageCount || book?.totalPages || 0;
+  const currentPage = userBook?.currentPage || 0;
+  const progressPercent = totalPages > 0 ? Math.min(100, Math.max(0, (currentPage / totalPages) * 100)) : 0;
+
   const addMutation = useMutation({
     mutationFn: async (ownership: string) => {
       if (!book) return;
@@ -55,7 +64,7 @@ export default function BookDetails() {
         title: book.title, author: book.author, isbn: book.isbn, coverUrl: book.coverUrl,
         language: book.language, description: book.description, pageCount: book.pageCount,
         seriesName: book.seriesName, seriesPosition: book.seriesPosition, genres: book.genres,
-        ownership // Pass to manual too
+        ownership
       });
     },
     onSuccess: () => {
@@ -72,7 +81,7 @@ export default function BookDetails() {
         status: userBook.status, currentPage: userBook.currentPage,
         personalRating: userBook.personalRating, privateNotes: userBook.privateNotes,
         lentTo: userBook.lentTo, ownership: userBook.ownership,
-        ...data // overwrite with new changes
+        ...data
       });
     },
     onMutate: async (newData) => {
@@ -136,8 +145,7 @@ export default function BookDetails() {
           <div className="p-8 text-center flex flex-col items-center mt-20">
             <BookOpen className="w-16 h-16 text-text-muted/30 mb-4" />
             <h2 className="text-2xl font-serif font-bold mb-2">Book not found</h2>
-            <p className="text-text-muted mb-6">We couldn't find this book.</p>
-            <button onClick={() => navigate('/library')} className="bg-primary text-white px-6 py-2 rounded-lg">Go to Library</button>
+            <button onClick={() => navigate('/library')} className="bg-primary text-white px-6 py-2 rounded-lg mt-4">Go to Library</button>
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto">
@@ -164,33 +172,64 @@ export default function BookDetails() {
                     <div className="absolute bottom-3 left-3"><LanguageBadge code={book.language || 'en'} size="md" /></div>
                   </motion.div>
                   
-                  {/* Action Bar */}
-                  <div className="flex flex-col gap-2 w-full md:w-64">
+                  {/* 🔥 PREMIUM ACTION & PROGRESS CARD */}
+                  <div className="flex flex-col gap-4 w-full md:w-64 bg-surface border border-border rounded-2xl p-4 shadow-sm">
                     {isInLibrary ? (
-                      <div className="flex gap-2">
-                        <button onClick={() => { if(confirm(`Remove "${book.title}"?`)) removeMutation.mutate(); }} disabled={removeMutation.isPending} className="flex-1 bg-red-500/10 text-red-500 border border-red-500/20 py-3 rounded-xl font-medium hover:bg-red-500/20 transition-colors shadow-sm flex items-center justify-center gap-2 disabled:opacity-50">
-                          {removeMutation.isPending ? 'Removing...' : <><Trash2 className="w-4 h-4" /> Remove</>}
+                      <>
+                        {/* Progress Bar section */}
+                        {totalPages > 0 && (
+                          <div className="w-full">
+                            <div className="flex items-center justify-between text-xs font-medium mb-2">
+                              <span className="text-text-muted flex items-center gap-1">
+                                <TrendingUp className="w-3.5 h-3.5" /> Progress
+                              </span>
+                              <span className="text-primary font-bold">{Math.round(progressPercent)}%</span>
+                            </div>
+                            <div className="h-2 w-full bg-border rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-primary rounded-full transition-all duration-500 ease-out" 
+                                style={{ width: `${progressPercent}%` }} 
+                              />
+                            </div>
+                            <p className="text-[11px] text-text-muted mt-2 font-medium text-right">
+                              Page {currentPage} of {totalPages}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Primary Action */}
+                        <button onClick={() => setIsLogSessionOpen(true)} className="w-full bg-primary text-white py-3 rounded-xl font-medium hover:bg-primary-hover transition-colors shadow-sm flex items-center justify-center gap-2">
+                          <PenLine className="w-4 h-4" /> Log Session
                         </button>
-                        <button onClick={() => { updateMutation.mutate({ isFavourite: !userBook.isFavourite }); }} className="p-3 border border-border rounded-xl bg-surface hover:bg-bg shadow-sm transition-colors">
-                          <Heart className={cn("w-5 h-5 transition-colors", userBook.isFavourite ? "fill-red-500 text-red-500" : "text-text-muted")} />
-                        </button>
-                      </div>
+                        
+                        {/* Secondary Actions */}
+                        <div className="flex gap-2 w-full pt-1">
+                          <button onClick={() => { if(confirm(`Remove "${book.title}"?`)) removeMutation.mutate(); }} disabled={removeMutation.isPending} className="flex-1 bg-bg border border-border text-text-muted py-2.5 rounded-xl font-medium hover:text-red-500 hover:border-red-500/50 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50 text-xs">
+                            {removeMutation.isPending ? 'Removing...' : <><Trash2 className="w-3.5 h-3.5" /> Remove</>}
+                          </button>
+                          <button onClick={() => updateMutation.mutate({ isFavourite: !userBook.isFavourite })} className="px-3 py-2.5 border border-border rounded-xl bg-bg hover:bg-surface transition-colors group">
+                            <Heart className={cn("w-4 h-4 transition-colors", userBook.isFavourite ? "fill-red-500 text-red-500" : "text-text-muted group-hover:text-red-400")} />
+                          </button>
+                          <button onClick={handleShare} className="px-3 py-2.5 border border-border rounded-xl bg-bg hover:bg-surface transition-colors group text-text-muted hover:text-text">
+                            <Share2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </>
                     ) : (
-                      <div className="flex gap-2">
-                        <button onClick={() => addMutation.mutate('Owned')} disabled={addMutation.isPending} className="flex-1 bg-primary text-white py-3 rounded-xl font-medium hover:bg-primary-hover transition-colors shadow-sm disabled:opacity-50">
+                      <>
+                        <button onClick={() => addMutation.mutate('Owned')} disabled={addMutation.isPending} className="w-full bg-primary text-white py-3.5 rounded-xl font-medium hover:bg-primary-hover transition-colors shadow-sm disabled:opacity-50">
                           {addMutation.isPending ? 'Adding...' : 'Add to Library'}
                         </button>
-                        <button onClick={() => addMutation.mutate('Wishlist')} disabled={addMutation.isPending} className="flex-1 bg-surface border border-border text-text py-3 rounded-xl font-medium hover:border-primary transition-colors shadow-sm disabled:opacity-50">
-                          + Wishlist
-                        </button>
-                      </div>
+                        <div className="flex gap-2 w-full">
+                          <button onClick={() => addMutation.mutate('Wishlist')} disabled={addMutation.isPending} className="flex-1 bg-surface border border-border text-text py-2.5 rounded-xl font-medium hover:border-primary transition-colors shadow-sm disabled:opacity-50 text-sm">
+                            + Wishlist
+                          </button>
+                          <button onClick={handleShare} className="px-3 py-2.5 border border-border rounded-xl bg-surface hover:bg-bg shadow-sm transition-colors text-text-muted hover:text-text">
+                            <Share2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </>
                     )}
-                    
-                    <div className="flex gap-2">
-                       <button onClick={handleShare} className="flex-1 p-3 border border-border rounded-xl bg-surface hover:bg-bg shadow-sm flex items-center justify-center gap-2 text-sm font-medium">
-                         <Share2 className="w-4 h-4 text-text-muted" /> Share
-                       </button>
-                    </div>
                   </div>
                 </div>
 
@@ -207,7 +246,6 @@ export default function BookDetails() {
                   )}
 
                   <div className="flex items-center gap-6 text-sm text-text-muted bg-surface p-3 rounded-xl border border-border w-fit">
-                    {/* 🔥 Interactive Rating */}
                     <div className="flex items-center gap-2">
                       <StarRating 
                         rating={userBook?.personalRating || 0} 
@@ -220,7 +258,7 @@ export default function BookDetails() {
                       </span>
                     </div>
                     <span className="w-px h-4 bg-border"></span>
-                    <span className="font-medium">{book.pageCount || book.totalPages ? `${book.pageCount || book.totalPages} pages` : 'Unknown'}</span>
+                    <span className="font-medium">{totalPages ? `${totalPages} pages` : 'Unknown'}</span>
                   </div>
 
                   <div className="flex border-b border-border mt-8 gap-6">
@@ -256,9 +294,8 @@ export default function BookDetails() {
                       </div>
                     )}
                     
-                    {/* 🔥 Integrated Reviews Section */}
                     {activeTab === 'reviews' && (
-                      <ReviewsSection bookId={book.id} />
+                      <ReviewsSection bookId={globalBookId} />
                     )}
 
                     {activeTab === 'notes' && (
@@ -279,6 +316,10 @@ export default function BookDetails() {
           </div>
         )}
       </main>
+
+      {isLogSessionOpen && userBook && (
+        <LogSessionModal book={userBook} onClose={() => setIsLogSessionOpen(false)} />
+      )}
     </div>
   );
 }

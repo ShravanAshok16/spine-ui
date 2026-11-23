@@ -16,6 +16,9 @@ import BookDetails from './pages/BookDetails';
 import ForYou from './pages/ForYou';
 import Settings from './pages/Settings'; // 🔥 Added import
 import type { ReactNode } from 'react';
+import PublicProfile from './pages/PublicProfile';
+import Feed from './pages/Feed';
+import Friends from './pages/Friends';
 
 function GlobalModals() {
   const { isAddModalOpen, closeAddModal } = useUI();
@@ -53,7 +56,10 @@ export default function App() {
           <Route path="/for-you" element={<ProtectedRoute><PageTransition><ForYou /></PageTransition></ProtectedRoute>} />
           {/* 🔥 Added Settings Route */}
           <Route path="/settings" element={<ProtectedRoute><PageTransition><Settings /></PageTransition></ProtectedRoute>} />
-          
+          <Route path="/friends" element={<ProtectedRoute><PageTransition><Friends /></PageTransition></ProtectedRoute>} />
+          <Route path="/feed" element={<ProtectedRoute><PageTransition><Feed /></PageTransition></ProtectedRoute>} />
+          <Route path="/u/:username" element={<ProtectedRoute><PageTransition><PublicProfile /></PageTransition></ProtectedRoute>} />
+
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </AnimatePresence>

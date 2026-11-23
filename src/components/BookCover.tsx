@@ -93,16 +93,22 @@ export function BookCover({ book, onClick, index = 0, onRequestDelete, isSelecte
   return (
     <motion.div
       layout="position"
-      whileHover={{ y: isSelectionMode ? 0 : -6, scale: isSelectionMode ? 1 : 1.01 }}
-      transition={{ type: "spring", stiffness: 300, damping: 25 }}
+      whileHover={{ 
+        y: isSelectionMode ? 0 : -8, 
+        scale: isSelectionMode ? 1 : 1.03,
+      }}
+      transition={{ type: "spring", stiffness: 400, damping: 25 }}
       whileTap={{ scale: 0.98 }}
       onClick={handleCardClick} // 🔥 Attached here
       className={cn("group cursor-pointer flex flex-col gap-3 animate-fade-up relative", isSelectionMode && "select-none")}
       style={{ animationDelay: `${index * 30}ms` }}
     >
       <div className={cn(
-        "relative aspect-[2/3] w-full rounded-xl overflow-hidden bg-surface border-2 transition-all duration-300 shadow-sm group-hover:shadow-xl",
-        isSelected ? "border-primary shadow-lg ring-2 ring-primary/20" : "border-border"
+        "relative aspect-[2/3] w-full rounded-2xl overflow-hidden bg-surface border transition-all duration-300",
+        "shadow-sm group-hover:shadow-2xl group-hover:shadow-primary/10",
+        isSelected 
+          ? "border-primary ring-2 ring-primary/30" 
+          : "border-border/60 group-hover:border-primary/40"
       )}>
         
         {isSelectionMode && (
