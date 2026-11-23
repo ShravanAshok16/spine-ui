@@ -9,7 +9,8 @@ import { motion } from 'framer-motion';
 import { cn } from '../lib/utils';
 import { toast } from 'sonner';
 import { toggleFavourite, deleteUserBook } from '../api/library';
-import { StarRating } from '../components/StarRating'; // 🔥 Import the new component
+import { StarRating } from '../components/StarRating';
+import { ReviewsSection } from '../components/ReviewsSection'; // 🔥 Import the new component
 
 export default function BookDetails() {
   const { id } = useParams();
@@ -209,7 +210,7 @@ export default function BookDetails() {
                     {/* 🔥 Interactive Rating */}
                     <div className="flex items-center gap-2">
                       <StarRating 
-                        rating={userBook?.personalRating} 
+                        rating={userBook?.personalRating || 0} 
                         readonly={!isInLibrary} 
                         size="md"
                         onRatingChange={(r) => updateMutation.mutate({ personalRating: r })} 
@@ -255,10 +256,9 @@ export default function BookDetails() {
                       </div>
                     )}
                     
+                    {/* 🔥 Integrated Reviews Section */}
                     {activeTab === 'reviews' && (
-                      <div className="text-center py-12 text-text-muted bg-surface/50 rounded-xl border border-border">
-                        <p className="text-sm">No reviews yet.</p>
-                      </div>
+                      <ReviewsSection bookId={book.id} />
                     )}
 
                     {activeTab === 'notes' && (

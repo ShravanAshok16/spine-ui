@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Search, Trash2, X } from 'lucide-react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
@@ -21,7 +21,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 export default function Library() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedBooks, setSelectedBooks] = useState<Set<string>>(new Set());
-  const [isSelectionMode, setIsSelectionMode] = useState(false); // 🔥 New State
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSeriesModalOpen, setIsSeriesModalOpen] = useState(false);
   const [deleteConfig, setDeleteConfig] = useState<{ ids: string[], title: string, description: string } | null>(null);
@@ -30,16 +30,20 @@ export default function Library() {
   const navigate = useNavigate();
   const { openAddModal } = useUI();
 
-  const viewMode = (searchParams.get('view') as ViewMode) || 'grid';
-  const gridSize = (searchParams.get('size') as GridSize) || 'md';
+  // 🔥 Read from URL, fallback to localStorage, then default
+  const viewMode = (searchParams.get('view') as ViewMode) || (localStorage.getItem('spine_lib_view') as ViewMode) || 'grid';
+  const gridSize = (searchParams.get('size') as GridSize) || (localStorage.getItem('spine_lib_size') as GridSize) || 'md';
   const filterStatus = (searchParams.get('status') as FilterStatus) || 'All';
-  const sortBy = (searchParams.get('sort') as SortOption) || 'newest';
+  const sortBy = (searchParams.get('sort') as SortOption) || (localStorage.getItem('spine_lib_sort') as SortOption) || 'newest';
   const groupBySeries = searchParams.get('group') === 'true';
   const search = searchParams.get('search') || '';
   const ownership = searchParams.get('ownership') || 'All';
   const minRating = searchParams.get('rating') || 'All';
 
   const updateParam = (key: string, value: string) => {
+    if (key === 'view' || key === 'size' || key === 'sort') {
+      localStorage.setItem(`spine_lib_${key}`, value);
+    }
     const newParams = new URLSearchParams(searchParams);
     if (value === 'All' || value === '' || (key === 'view' && value === 'grid') || (key === 'size' && value === 'md')) {
       newParams.delete(key);
@@ -52,8 +56,7 @@ export default function Library() {
   const { data: books = [], isLoading } = useQuery({
     queryKey: ['library'],
     queryFn: () => getMyLibrary(),
-    refetchOnMount: 'always',
-    staleTime: 0,
+    staleTime: 1000 * 60 * 5, // 🔥 Cache for 5 minutes
   });
 
   const filteredBooks = useMemo(() => {
@@ -121,7 +124,7 @@ export default function Library() {
       toast.success('Books moved to Trash');
       queryClient.invalidateQueries({ queryKey: ['library'] });
       setSelectedBooks(new Set());
-      setIsSelectionMode(false); // Exit selection mode after delete
+      setIsSelectionMode(false);
       setDeleteConfig(null);
     } catch (err: any) {
       toast.error(err.message);
@@ -169,14 +172,14 @@ export default function Library() {
             gridSize={gridSize} setGridSize={(s) => updateParam('size', s)}
             ownership={ownership} setOwnership={(o) => updateParam('ownership', o)}
             minRating={minRating} setMinRating={(r) => updateParam('rating', r)}
-            isSelectionMode={isSelectionMode} setIsSelectionMode={setIsSelectionMode} // 🔥 Pass to toolbar
+            isSelectionMode={isSelectionMode} setIsSelectionMode={setIsSelectionMode}
           />
 
           {isLoading ? (
             <div className={`grid ${gridClasses[gridSize]} pb-20`}>
               {Array.from({ length: 10 }).map((_, i) => (
                 <div key={i} className="flex flex-col gap-3">
-                  <div className="aspect-[2/3] w-full bg-surface rounded-lg border border-border animate-pulse" />
+                  <div className="aspect-[2/3] w-full bg-surface rounded-xl border border-border animate-pulse" />
                   <div className="h-4 bg-surface rounded w-3/4 animate-pulse" />
                   <div className="h-3 bg-surface rounded w-1/2 animate-pulse" />
                 </div>
@@ -206,7 +209,7 @@ export default function Library() {
                   onRequestDelete={handleIndividualDelete} 
                   isSelected={selectedBooks.has(book.id)} 
                   onToggleSelect={() => toggleSelection(book.id)} 
-                  isSelectionMode={isSelectionMode} // 🔥 Pass to cover
+                  isSelectionMode={isSelectionMode}
                 />
               ))}
             </div>
@@ -217,7 +220,7 @@ export default function Library() {
                   {isSelectionMode && (
                     <input type="checkbox" checked={selectedBooks.has(book.id)} onChange={() => toggleSelection(book.id)} className="w-5 h-5 accent-primary" />
                   )}
-                  <div className="flex-1" onClick={() => isSelectionMode ? toggleSelection(book.id) : navigate(`/books/${book.id}?source=library`)}> 
+                  <div className="flex-1" onClick={() => isSelectionMode ? toggleSelection(book.id) : navigate(`/books/${book.id}`)}> 
                     <BookListItem book={book} />
                   </div>
                 </div>
@@ -239,34 +242,16 @@ export default function Library() {
               </button>
               <div className="h-6 w-px bg-border"></div>
               <span className="text-sm font-medium px-2">{selectedBooks.size} selected</span>
-              <motion.button
-                whileTap={{ scale: 0.96 }}
-                onClick={handleBatchDelete}
-                disabled={isDeleting}
-                className="bg-red-500 text-white px-5 py-2 rounded-full text-sm font-medium flex items-center gap-2 hover:bg-red-600 transition-colors disabled:opacity-50"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete
+              <motion.button whileTap={{ scale: 0.96 }} onClick={handleBatchDelete} disabled={isDeleting} className="bg-red-500 text-white px-5 py-2 rounded-full text-sm font-medium flex items-center gap-2 hover:bg-red-600 transition-colors disabled:opacity-50">
+                <Trash2 className="w-4 h-4" /> Delete
               </motion.button>
             </motion.div>
           )}
         </AnimatePresence>
       </main>
 
-      <CreateSeriesModal 
-        isOpen={isSeriesModalOpen} 
-        onClose={() => setIsSeriesModalOpen(false)} 
-        availableBooks={books} 
-      />
-
-      <ConfirmDialog 
-        isOpen={!!deleteConfig}
-        title={deleteConfig?.title || ''}
-        description={deleteConfig?.description || ''}
-        confirmLabel="Move to Trash"
-        onConfirm={executeDelete}
-        onCancel={() => setDeleteConfig(null)}
-      />
+      <CreateSeriesModal isOpen={isSeriesModalOpen} onClose={() => setIsSeriesModalOpen(false)} availableBooks={books} />
+      <ConfirmDialog isOpen={!!deleteConfig} title={deleteConfig?.title || ''} description={deleteConfig?.description || ''} confirmLabel="Move to Trash" onConfirm={executeDelete} onCancel={() => setDeleteConfig(null)} />
     </div>
   );
 }

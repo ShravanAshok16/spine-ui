@@ -14,6 +14,7 @@ import Library from './pages/Library';
 import Discover from './pages/Discover';
 import BookDetails from './pages/BookDetails';
 import ForYou from './pages/ForYou';
+import Settings from './pages/Settings'; // 🔥 Added import
 import type { ReactNode } from 'react';
 
 function GlobalModals() {
@@ -50,6 +51,8 @@ export default function App() {
           <Route path="/discover" element={<ProtectedRoute><PageTransition><Discover /></PageTransition></ProtectedRoute>} />
           <Route path="/books/:id" element={<ProtectedRoute><PageTransition><BookDetails /></PageTransition></ProtectedRoute>} />
           <Route path="/for-you" element={<ProtectedRoute><PageTransition><ForYou /></PageTransition></ProtectedRoute>} />
+          {/* 🔥 Added Settings Route */}
+          <Route path="/settings" element={<ProtectedRoute><PageTransition><Settings /></PageTransition></ProtectedRoute>} />
           
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

@@ -21,11 +21,11 @@ export function LogSessionModal({ book, onClose }: Props) {
       await apiClient.post(`/api/UserBooks/${book.id}/sessions`, { pagesRead });
     },
     onSuccess: () => {
-      toast.success(`Logged ${pages} pages!`);
-      queryClient.invalidateQueries({ queryKey: ['library'] });
-      queryClient.invalidateQueries({ queryKey: ['sessionStats'] });
-      onClose();
-    },
+    toast.success(`Logged ${pages} pages!`);
+    queryClient.invalidateQueries({ queryKey: ['library'] });
+    queryClient.invalidateQueries({ queryKey: ['sessionStats'] }); // 🔥 Critical
+    onClose();
+  },
     onError: () => toast.error("Failed to log session")
   });
 

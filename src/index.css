@@ -68,3 +68,14 @@ body {
     display: none;
   }
 }
+
+/* Add this below your existing .dark block */
+.void {
+  --color-bg: #000000;
+  --color-surface: #0a0a0a;
+  --color-text: #f3f4f6;
+  --color-text-muted: #9ca3af;
+  --color-primary: #6366f1;
+  --color-primary-hover: #818cf8;
+  --color-border: #1f1f1f;
+}

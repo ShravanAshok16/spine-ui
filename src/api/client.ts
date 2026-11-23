@@ -44,3 +44,18 @@ apiClient.interceptors.response.use(
     return Promise.reject(new Error(message));
   }
 );
+
+export async function updateProfile(data: any) {
+  const res = await apiClient.put('/api/Account/profile', data);
+  return res.data;
+}
+
+export async function updateEmail(data: any) {
+  const res = await apiClient.put('/api/Account/email', data);
+  return res.data;
+}
+
+export async function updatePassword(data: any) {
+  const res = await apiClient.put('/api/Account/password', data);
+  return res.data;
+}

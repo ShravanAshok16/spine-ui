@@ -1,39 +1,51 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { jwtDecode } from 'jwt-decode'; // 🔥 npm install jwt-decode
+import { apiClient } from '../api/client';
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  displayName: string;
+  firstName: string;
+  lastName: string;
+  phoneNumber: string;
+}
 
 interface AuthContextType {
   token: string | null;
-  user: { id: string; email: string; displayName: string; firstName: string; lastName: string } | null;
+  user: UserProfile | null;
   login: (token: string) => void;
   logout: () => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('spine_token'));
-  const [user, setUser] = useState<AuthContextType['user']>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
 
-  // Parse the token whenever it changes
-  useEffect(() => {
-    if (token) {
-      try {
-        const decoded: any = jwtDecode(token);
-        console.log("Decoded Token:", decoded)
-        setUser({
-          id: decoded.sub,
-          email: decoded.email,
-          displayName: decoded.DisplayName || decoded.email.split('@')[0], // fallback to email prefix
-          firstName: decoded.FirstName || "",
-          lastName: decoded.LastName || "",
-        });
-      } catch (e) {
-        console.error("Invalid token", e);
-        setUser(null);
-      }
-    } else {
+  const fetchUser = async () => {
+    if (!token) {
       setUser(null);
+      return;
     }
+    try {
+      const { data } = await apiClient.get('/api/Account/me');
+      setUser({
+        id: data.id,
+        email: data.email,
+        displayName: data.displayName || '',
+        firstName: data.firstName || '',
+        lastName: data.lastName || '',
+        phoneNumber: data.phoneNumber || ''
+      });
+    } catch (error) {
+      console.error('Failed to fetch user profile', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchUser();
   }, [token]);
 
   const login = (newToken: string) => {
@@ -44,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     localStorage.removeItem('spine_token');
     setToken(null);
+    setUser(null);
   };
 
   useEffect(() => {
@@ -53,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ token, user, login, logout }}>
+    <AuthContext.Provider value={{ token, user, login, logout, refreshUser: fetchUser }}>
       {children}
     </AuthContext.Provider>
   );

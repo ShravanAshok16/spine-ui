@@ -10,18 +10,14 @@ export function StatsRow({ books, onReadingClick }: Props) {
   const total = books.length;
   const reading = books.filter((b) => b.status === 'Reading').length;
   const finished = books.filter((b) => b.status === 'Finished').length;
-  
-  // Calculate Average Pages
   const booksWithPages = books.filter(b => b.totalPages && b.totalPages > 0);
-  const avgPages = booksWithPages.length > 0 
-    ? Math.round(booksWithPages.reduce((sum, b) => sum + (b.totalPages || 0), 0) / booksWithPages.length)
-    : 0;
+  const avgPages = booksWithPages.length > 0 ? Math.round(booksWithPages.reduce((sum, b) => sum + (b.totalPages || 0), 0) / booksWithPages.length) : 0;
 
   const stats = [
-    { label: 'Total Books', value: total, icon: Book, color: 'text-primary' },
-    { label: 'Reading', value: reading, icon: BookOpen, color: 'text-blue-500', onClick: onReadingClick },
-    { label: 'Finished', value: finished, icon: CheckCircle, color: 'text-green-500' },
-    { label: 'Avg Pages', value: avgPages, icon: FileText, color: 'text-purple-500' },
+    { label: 'Total Books', value: total, icon: Book, color: 'text-primary', bg: 'from-primary/10 to-transparent' },
+    { label: 'Reading', value: reading, icon: BookOpen, color: 'text-blue-500', bg: 'from-blue-500/10 to-transparent', onClick: onReadingClick },
+    { label: 'Finished', value: finished, icon: CheckCircle, color: 'text-green-500', bg: 'from-green-500/10 to-transparent' },
+    { label: 'Avg Pages', value: avgPages, icon: FileText, color: 'text-purple-500', bg: 'from-purple-500/10 to-transparent' },
   ];
 
   return (
@@ -33,11 +29,9 @@ export function StatsRow({ books, onReadingClick }: Props) {
             key={stat.label}
             onClick={stat.onClick}
             disabled={!stat.onClick}
-            className={`bg-surface border border-border rounded-xl p-4 flex items-center gap-3 text-left transition-all ${
-              stat.onClick ? 'hover:shadow-md hover:border-primary/40 cursor-pointer' : 'cursor-default'
-            }`}
+            className={`bg-surface border border-border rounded-xl p-4 flex items-center gap-3 text-left transition-all ${stat.onClick ? 'hover:shadow-md hover:border-primary/40 cursor-pointer' : 'cursor-default'}`}
           >
-            <div className={`w-10 h-10 rounded-lg bg-bg flex items-center justify-center ${stat.color}`}>
+            <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${stat.bg} flex items-center justify-center ${stat.color}`}>
               <Icon className="w-5 h-5" />
             </div>
             <div>

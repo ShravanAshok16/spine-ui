@@ -2,7 +2,7 @@ import { useState, type SyntheticEvent, useMemo } from 'react';
 import { BookOpen, Trash2, Heart, MoreVertical, Check, Star } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
-import { deleteUserBook, toggleFavourite } from '../api/library';
+import { toggleFavourite } from '../api/library';
 import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 import type { UserBook } from '../api/types';
@@ -15,7 +15,7 @@ interface Props {
   onRequestDelete?: (id: string, title: string) => void;
   isSelected?: boolean;
   onToggleSelect?: () => void;
-  isSelectionMode?: boolean; // 🔥 New Prop
+  isSelectionMode?: boolean;
 }
 
 const statusStyles: Record<string, string> = {
@@ -55,12 +55,12 @@ export function BookCover({ book, onClick, index = 0, onRequestDelete, isSelecte
     }
   });
 
-  // 🔥 Handle different click behaviors
   const handleCardClick = (e: React.MouseEvent) => {
     if (isSelectionMode) {
       onToggleSelect?.();
-    } else {
-      onClick?.();
+    } else if (onClick) {
+      // 🔥 FIX: Explicitly call onClick
+      onClick();
     }
   };
 
@@ -92,30 +92,26 @@ export function BookCover({ book, onClick, index = 0, onRequestDelete, isSelecte
 
   return (
     <motion.div
-      whileHover={{ y: isSelectionMode ? 0 : -5 }} // Disable hover lift in selection mode
+      layout="position"
+      whileHover={{ y: isSelectionMode ? 0 : -6, scale: isSelectionMode ? 1 : 1.01 }}
+      transition={{ type: "spring", stiffness: 300, damping: 25 }}
       whileTap={{ scale: 0.98 }}
-      onClick={handleCardClick}
-      className={cn(
-        "group cursor-pointer flex flex-col gap-3 animate-fade-up relative",
-        isSelectionMode && "select-none"
-      )}
+      onClick={handleCardClick} // 🔥 Attached here
+      className={cn("group cursor-pointer flex flex-col gap-3 animate-fade-up relative", isSelectionMode && "select-none")}
       style={{ animationDelay: `${index * 30}ms` }}
     >
       <div className={cn(
-        "relative aspect-[2/3] w-full rounded-lg overflow-hidden bg-surface border-2 transition-all duration-200",
-        isSelected ? "border-primary shadow-lg" : "border-border shadow-sm"
+        "relative aspect-[2/3] w-full rounded-xl overflow-hidden bg-surface border-2 transition-all duration-300 shadow-sm group-hover:shadow-xl",
+        isSelected ? "border-primary shadow-lg ring-2 ring-primary/20" : "border-border"
       )}>
         
-        {/* 🔥 Selection Circle (Only shows in Selection Mode) */}
         {isSelectionMode && (
           <div className="absolute top-2 left-2 z-30">
             <button 
               onClick={handleSelect}
               className={cn(
                 "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
-                isSelected 
-                  ? "bg-primary border-primary text-white scale-110 shadow-md" 
-                  : "bg-black/40 border-white/70 text-transparent backdrop-blur-sm"
+                isSelected ? "bg-primary border-primary text-white scale-110 shadow-md" : "bg-black/40 border-white/70 text-transparent backdrop-blur-sm"
               )}
             >
               <Check className="w-4 h-4" strokeWidth={3} />
@@ -133,11 +129,7 @@ export function BookCover({ book, onClick, index = 0, onRequestDelete, isSelecte
             alt={book.title}
             onLoad={handleImageLoad}
             onError={() => setImageError(true)}
-            className={cn(
-              'w-full h-full object-cover transition-opacity duration-300', 
-              imageLoading ? 'opacity-0' : 'opacity-100', 
-              isSelected && 'brightness-75'
-            )}
+            className={cn('w-full h-full object-cover transition-opacity duration-300', imageLoading ? 'opacity-0' : 'opacity-100', isSelected && 'brightness-75')}
           />
         )}
 
@@ -158,35 +150,24 @@ export function BookCover({ book, onClick, index = 0, onRequestDelete, isSelecte
 
         {book.status && !isSelectionMode && (
           <div className="absolute top-2 right-2">
-            <span className={cn('text-xs font-medium px-2 py-0.5 rounded-full backdrop-blur-sm', statusStyles[book.status] || statusStyles.Unread)}>
+            <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-md uppercase tracking-wider shadow-sm', statusStyles[book.status] || statusStyles.Unread)}>
               {book.status}
             </span>
           </div>
         )}
 
-        {/* Bottom Right Actions: Favourite & Menu (Hidden in Selection Mode) */}
         {book.status && !isSelectionMode && (
           <div className="absolute bottom-2 right-2 z-20 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
             <button onClick={handleFavourite} className="bg-black/60 backdrop-blur-sm p-1.5 rounded-full text-white hover:bg-black/80 transition-colors">
               <Heart className={cn("w-4 h-4 transition-colors", book.isFavourite ? 'fill-red-500 text-red-500' : '')} />
             </button>
-            
             <div className="relative">
-              <button 
-                onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }} 
-                className="bg-black/60 backdrop-blur-sm p-1.5 rounded-full text-white hover:bg-black/80 transition-colors"
-              >
+              <button onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }} className="bg-black/60 backdrop-blur-sm p-1.5 rounded-full text-white hover:bg-black/80 transition-colors">
                 <MoreVertical className="w-4 h-4" />
               </button>
-              
               <AnimatePresence>
                 {showMenu && (
-                  <motion.div 
-                    initial={{ opacity: 0, scale: 0.9, y: -10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                    className="absolute bottom-full right-0 mb-2 w-32 bg-surface border border-border rounded-xl shadow-xl overflow-hidden z-50"
-                  >
+                  <motion.div initial={{ opacity: 0, scale: 0.9, y: -10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: -10 }} className="absolute bottom-full right-0 mb-2 w-32 bg-surface border border-border rounded-xl shadow-xl overflow-hidden z-50">
                     <button onClick={handleDelete} className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-500/10 flex items-center gap-2">
                       <Trash2 className="w-4 h-4" /> Delete
                     </button>
@@ -204,21 +185,13 @@ export function BookCover({ book, onClick, index = 0, onRequestDelete, isSelecte
         )}
       </div>
 
-      <div className="flex flex-col">
+      <div className="flex flex-col px-0.5">
         <h3 className="font-serif font-semibold text-sm leading-snug line-clamp-2 group-hover:text-primary transition-colors">{book.title}</h3>
         <p className="text-xs text-text-muted mt-1 line-clamp-1">{book.author}</p>
-        
-        {/* 🔥 Star Rating */}
         {book.personalRating ? (
-          <div className="flex items-center gap-0.5 mt-1">
+          <div className="flex items-center gap-0.5 mt-1.5">
             {[1, 2, 3, 4, 5].map((star) => (
-              <Star 
-                key={star} 
-                className={cn(
-                  "w-3 h-3", 
-                  star <= (book.personalRating || 0) ? "fill-yellow-500 text-yellow-500" : "fill-transparent text-gray-400 dark:text-gray-600"
-                )} 
-              />
+              <Star key={star} className={cn("w-3 h-3", star <= (book.personalRating || 0) ? "fill-yellow-500 text-yellow-500" : "fill-transparent text-gray-400 dark:text-gray-600")} />
             ))}
           </div>
         ) : null}
