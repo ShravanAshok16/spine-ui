@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Search, Trash2, X, BookOpen } from 'lucide-react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { Helmet } from 'react-helmet-async';
 import { getMyLibrary, batchDeleteBooks, deleteUserBook } from '../api/library';
 import { BookCover } from '../components/BookCover';
 import { BookListItem } from '../components/BookListItem';
@@ -39,7 +40,6 @@ export default function Library() {
   const navigate = useNavigate();
   const { openAddModal } = useUI();
 
-  // Read from URL, fall back to localStorage, then default
   const viewMode =
     (searchParams.get('view') as ViewMode) ||
     (localStorage.getItem('spine_lib_view') as ViewMode) ||
@@ -170,165 +170,171 @@ export default function Library() {
   };
 
   return (
-    <div className="h-screen overflow-hidden flex bg-bg">
-      <div className="flex-shrink-0 hidden md:block">
-        <Sidebar />
-      </div>
+    <>
+      <Helmet>
+        <title>My Library | Spine</title>
+        <meta name="description" content="View and manage your personal book collection on Spine." />
+      </Helmet>
 
-      <main className="flex-1 flex flex-col min-w-0">
-        {/* Header */}
-        <header className="h-16 border-b border-border bg-surface/80 backdrop-blur-md shadow-[0_1px_12px_-4px] shadow-primary/20 flex items-center justify-between px-6 md:px-8 gap-4 flex-shrink-0 relative z-10">
-          <div className="flex-1 max-w-lg relative group">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => updateParam('search', e.target.value)}
-              placeholder="Search your library..."
-              className="w-full pl-10 pr-4 py-2 border border-border rounded-lg bg-bg focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm"
-            />
-          </div>
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
-          </div>
-        </header>
-
-        <div className="flex-1 overflow-y-auto p-6 md:p-8 pb-32">
-          <LibraryToolbar
-            viewMode={viewMode}
-            setViewMode={(v) => updateParam('view', v)}
-            filterStatus={filterStatus}
-            setFilterStatus={(s) => updateParam('status', s)}
-            languages={[]}
-            selectedLanguage="All"
-            setSelectedLanguage={() => {}}
-            genres={[]}
-            selectedGenre="All"
-            setSelectedGenre={() => {}}
-            sortBy={sortBy}
-            setSortBy={(s) => updateParam('sort', s)}
-            groupBySeries={groupBySeries}
-            setGroupBySeries={(g) => updateParam('group', g.toString())}
-            onCreateSeries={() => setIsSeriesModalOpen(true)}
-            gridSize={gridSize}
-            setGridSize={(s) => updateParam('size', s)}
-            ownership={ownership}
-            setOwnership={(o) => updateParam('ownership', o)}
-            minRating={minRating}
-            setMinRating={(r) => updateParam('rating', r)}
-            isSelectionMode={isSelectionMode}
-            setIsSelectionMode={setIsSelectionMode}
-          />
-
-          {isLoading ? (
-            <div className={`grid ${gridClasses[gridSize]} pb-20`}>
-              {Array.from({ length: 10 }).map((_, i) => (
-                <div key={i} className="flex flex-col gap-3">
-                  <div className="aspect-[2/3] w-full bg-surface rounded-xl border border-border animate-pulse" />
-                  <div className="h-4 bg-surface rounded w-3/4 animate-pulse" />
-                  <div className="h-3 bg-surface rounded w-1/2 animate-pulse" />
-                </div>
-              ))}
-            </div>
-          ) : books.length === 0 ? (
-            <EmptyState
-              icon={<BookOpen className="w-8 h-8" />}
-              title="Your library is empty"
-              description="Start building your collection by adding your first book."
-              action={{ label: 'Add a Book', onClick: openAddModal }}
-            />
-          ) : groupBySeries ? (
-            <div className="flex flex-col gap-6 pb-20">
-              {Object.entries(groupedBooks).map(([seriesName, booksInSeries]) => (
-                <SeriesGroup key={seriesName} seriesName={seriesName} books={booksInSeries} />
-              ))}
-            </div>
-          ) : viewMode === 'grid' ? (
-            <div className={`grid ${gridClasses[gridSize]} pb-20`}>
-              {filteredBooks.map((book, index) => (
-                <BookCover
-                  key={book.id}
-                  book={book}
-                  index={index}
-                  onClick={() => navigate(`/books/${book.id}`)}
-                  onRequestDelete={handleIndividualDelete}
-                  isSelected={selectedBooks.has(book.id)}
-                  onToggleSelect={() => toggleSelection(book.id)}
-                  isSelectionMode={isSelectionMode}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3 pb-20">
-              {filteredBooks.map((book) => (
-                <div key={book.id} className="flex items-center gap-4">
-                  {isSelectionMode && (
-                    <input
-                      type="checkbox"
-                      checked={selectedBooks.has(book.id)}
-                      onChange={() => toggleSelection(book.id)}
-                      className="w-5 h-5 accent-primary"
-                    />
-                  )}
-                  <div
-                    className="flex-1"
-                    onClick={() =>
-                      isSelectionMode ? toggleSelection(book.id) : navigate(`/books/${book.id}`)
-                    }
-                  >
-                    <BookListItem book={book} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+      <div className="h-screen overflow-hidden flex bg-bg">
+        <div className="flex-shrink-0 hidden md:block">
+          <Sidebar />
         </div>
 
-        <AnimatePresence>
-          {selectedBooks.size > 0 && (
-            <motion.div
-              initial={{ y: 100, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 100, opacity: 0 }}
-              className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-surface/90 backdrop-blur-md border border-border shadow-2xl rounded-full px-4 py-2 flex items-center gap-4 z-50"
-            >
-              <button
-                onClick={() => {
-                  setSelectedBooks(new Set());
-                  setIsSelectionMode(false);
-                }}
-                className="p-2 hover:bg-bg rounded-full transition-colors text-text-muted"
-              >
-                <X className="w-5 h-5" />
-              </button>
-              <div className="h-6 w-px bg-border"></div>
-              <span className="text-sm font-medium px-2">{selectedBooks.size} selected</span>
-              <motion.button
-                whileTap={{ scale: 0.96 }}
-                onClick={handleBatchDelete}
-                disabled={isDeleting}
-                className="bg-red-500 text-white px-5 py-2 rounded-full text-sm font-medium flex items-center gap-2 hover:bg-red-600 transition-colors disabled:opacity-50"
-              >
-                <Trash2 className="w-4 h-4" /> Delete
-              </motion.button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </main>
+        <main className="flex-1 flex flex-col min-w-0">
+          <header className="h-16 border-b border-border bg-surface/80 backdrop-blur-md shadow-[0_1px_12px_-4px] shadow-primary/20 flex items-center justify-between px-6 md:px-8 gap-4 flex-shrink-0 relative z-10">
+            <div className="flex-1 max-w-lg relative group">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => updateParam('search', e.target.value)}
+                placeholder="Search your library..."
+                className="w-full pl-10 pr-4 py-2 border border-border rounded-lg bg-bg focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <ThemeToggle />
+            </div>
+          </header>
 
-      <CreateSeriesModal
-        isOpen={isSeriesModalOpen}
-        onClose={() => setIsSeriesModalOpen(false)}
-        availableBooks={books}
-      />
-      <ConfirmDialog
-        isOpen={!!deleteConfig}
-        title={deleteConfig?.title || ''}
-        description={deleteConfig?.description || ''}
-        confirmLabel="Move to Trash"
-        onConfirm={executeDelete}
-        onCancel={() => setDeleteConfig(null)}
-      />
-    </div>
+          <div className="flex-1 overflow-y-auto p-6 md:p-8 pb-32">
+            <LibraryToolbar
+              viewMode={viewMode}
+              setViewMode={(v) => updateParam('view', v)}
+              filterStatus={filterStatus}
+              setFilterStatus={(s) => updateParam('status', s)}
+              languages={[]}
+              selectedLanguage="All"
+              setSelectedLanguage={() => {}}
+              genres={[]}
+              selectedGenre="All"
+              setSelectedGenre={() => {}}
+              sortBy={sortBy}
+              setSortBy={(s) => updateParam('sort', s)}
+              groupBySeries={groupBySeries}
+              setGroupBySeries={(g) => updateParam('group', g.toString())}
+              onCreateSeries={() => setIsSeriesModalOpen(true)}
+              gridSize={gridSize}
+              setGridSize={(s) => updateParam('size', s)}
+              ownership={ownership}
+              setOwnership={(o) => updateParam('ownership', o)}
+              minRating={minRating}
+              setMinRating={(r) => updateParam('rating', r)}
+              isSelectionMode={isSelectionMode}
+              setIsSelectionMode={setIsSelectionMode}
+            />
+
+            {isLoading ? (
+              <div className={`grid ${gridClasses[gridSize]} pb-20`}>
+                {Array.from({ length: 10 }).map((_, i) => (
+                  <div key={i} className="flex flex-col gap-3">
+                    <div className="aspect-[2/3] w-full bg-surface rounded-xl border border-border animate-pulse" />
+                    <div className="h-4 bg-surface rounded w-3/4 animate-pulse" />
+                    <div className="h-3 bg-surface rounded w-1/2 animate-pulse" />
+                  </div>
+                ))}
+              </div>
+            ) : books.length === 0 ? (
+              <EmptyState
+                icon={<BookOpen className="w-8 h-8" />}
+                title="Your library is empty"
+                description="Start building your collection by adding your first book."
+                action={{ label: 'Add a Book', onClick: openAddModal }}
+              />
+            ) : groupBySeries ? (
+              <div className="flex flex-col gap-6 pb-20">
+                {Object.entries(groupedBooks).map(([seriesName, booksInSeries]) => (
+                  <SeriesGroup key={seriesName} seriesName={seriesName} books={booksInSeries} />
+                ))}
+              </div>
+            ) : viewMode === 'grid' ? (
+              <div className={`grid ${gridClasses[gridSize]} pb-20`}>
+                {filteredBooks.map((book, index) => (
+                  <BookCover
+                    key={book.id}
+                    book={book}
+                    index={index}
+                    onClick={() => navigate(`/books/${book.id}`)}
+                    onRequestDelete={handleIndividualDelete}
+                    isSelected={selectedBooks.has(book.id)}
+                    onToggleSelect={() => toggleSelection(book.id)}
+                    isSelectionMode={isSelectionMode}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3 pb-20">
+                {filteredBooks.map((book) => (
+                  <div key={book.id} className="flex items-center gap-4">
+                    {isSelectionMode && (
+                      <input
+                        type="checkbox"
+                        checked={selectedBooks.has(book.id)}
+                        onChange={() => toggleSelection(book.id)}
+                        className="w-5 h-5 accent-primary"
+                      />
+                    )}
+                    <div
+                      className="flex-1"
+                      onClick={() =>
+                        isSelectionMode ? toggleSelection(book.id) : navigate(`/books/${book.id}`)
+                      }
+                    >
+                      <BookListItem book={book} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <AnimatePresence>
+            {selectedBooks.size > 0 && (
+              <motion.div
+                initial={{ y: 100, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 100, opacity: 0 }}
+                className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-surface/90 backdrop-blur-md border border-border shadow-2xl rounded-full px-4 py-2 flex items-center gap-4 z-50"
+              >
+                <button
+                  onClick={() => {
+                    setSelectedBooks(new Set());
+                    setIsSelectionMode(false);
+                  }}
+                  className="p-2 hover:bg-bg rounded-full transition-colors text-text-muted"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+                <div className="h-6 w-px bg-border"></div>
+                <span className="text-sm font-medium px-2">{selectedBooks.size} selected</span>
+                <motion.button
+                  whileTap={{ scale: 0.96 }}
+                  onClick={handleBatchDelete}
+                  disabled={isDeleting}
+                  className="bg-red-500 text-white px-5 py-2 rounded-full text-sm font-medium flex items-center gap-2 hover:bg-red-600 transition-colors disabled:opacity-50"
+                >
+                  <Trash2 className="w-4 h-4" /> Delete
+                </motion.button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </main>
+
+        <CreateSeriesModal
+          isOpen={isSeriesModalOpen}
+          onClose={() => setIsSeriesModalOpen(false)}
+          availableBooks={books}
+        />
+        <ConfirmDialog
+          isOpen={!!deleteConfig}
+          title={deleteConfig?.title || ''}
+          description={deleteConfig?.description || ''}
+          confirmLabel="Move to Trash"
+          onConfirm={executeDelete}
+          onCancel={() => setDeleteConfig(null)}
+        />
+      </div>
+    </>
   );
 }

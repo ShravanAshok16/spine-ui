@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import { EmptyState } from '../components/EmptyState';
 import { Compass, ChevronRight, BookOpen } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 
 function useDiscoverRow(key: string, params: string) {
   return useQuery({
@@ -66,7 +67,6 @@ export function DiscoverRow({ title, subtitle, books, isLoading }: { title: stri
                   <div className="w-full h-full bg-primary/10 flex items-center justify-center"><BookOpen className="w-8 h-8 text-primary/40" /></div>
                 )}
                 
-                {/* Premium Gradient Overlay on Hover */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
                   <p className="text-white text-xs font-medium line-clamp-2">{book.title}</p>
                   <p className="text-white/70 text-[10px] line-clamp-1 mt-1">{book.author}</p>
@@ -91,69 +91,73 @@ export default function Discover() {
   const { data: romanceBooks = [], isLoading: romanceLoading } = useDiscoverRow('romance', 'subject=romance');
 
   const isLoading = fantasyLoading && kannadaLoading && tamilLoading && mysteryLoading && romanceLoading;
-  
-  // Pick the first book as the featured hero
   const featuredBook = fantasyBooks.length > 0 ? fantasyBooks[0] : null;
 
   return (
-    <div className="h-screen overflow-hidden flex bg-bg">
-      <div className="flex-shrink-0 hidden md:block"><Sidebar /></div>
-      
-      <main className="flex-1 flex flex-col min-w-0">
-        <header className="h-20 border-b border-border bg-surface flex items-center justify-between px-6 md:px-8 flex-shrink-0 sticky top-0 z-20 backdrop-blur-md bg-surface/80">
-          <div>
-            <h1 className="text-2xl font-serif font-bold text-text tracking-tight">Discover</h1>
-            <p className="text-sm text-text-muted mt-1">Find your next great read.</p>
-          </div>
-          <ThemeToggle />
-        </header>
+    <>
+      <Helmet>
+        <title>Discover | Spine</title>
+        <meta name="description" content="Discover trending books, new releases, and hidden gems across different languages and genres." />
+      </Helmet>
 
-        <div className="flex-1 overflow-y-auto p-6 md:p-8 pb-20">
-          {isLoading ? (
-            <div className="space-y-12">
-              <div className="h-64 bg-surface rounded-3xl animate-pulse"></div>
-              {[1, 2, 3].map(i => <div key={i} className="h-64 bg-surface rounded-2xl animate-pulse"></div>)}
+      <div className="h-screen overflow-hidden flex bg-bg">
+        <div className="flex-shrink-0 hidden md:block"><Sidebar /></div>
+        
+        <main className="flex-1 flex flex-col min-w-0">
+          <header className="h-20 border-b border-border bg-surface flex items-center justify-between px-6 md:px-8 flex-shrink-0 sticky top-0 z-20 backdrop-blur-md bg-surface/80">
+            <div>
+              <h1 className="text-2xl font-serif font-bold text-text tracking-tight">Discover</h1>
+              <p className="text-sm text-text-muted mt-1">Find your next great read.</p>
             </div>
-          ) : fantasyBooks.length === 0 ? (
-            <EmptyState 
-              icon={<Compass className="w-8 h-8" />}
-              title="Nothing to discover yet"
-              description="Add a few books to your library so we can find more for you."
-              action={{ label: "Go to Library", onClick: () => navigate('/library') }}
-            />
-          ) : (
-            <div className="max-w-7xl mx-auto">
-              
-              {/* 🔥 FEATURED HERO SECTION */}
-              {featuredBook && (
-                <div className="relative w-full h-[340px] rounded-3xl overflow-hidden mb-12 border border-border shadow-lg group">
-                  <img src={featuredBook.coverUrl} className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-40 scale-110" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/80 to-transparent" />
-                  <div className="relative z-10 h-full flex flex-col md:flex-row items-center md:items-end p-8 md:p-10 gap-8">
-                    <img src={featuredBook.coverUrl} className="w-32 h-48 md:w-40 md:h-60 rounded-xl shadow-2xl border-2 border-white/20 object-cover group-hover:scale-105 transition-transform duration-500" />
-                    <div className="pb-2 text-center md:text-left">
-                      <p className="text-primary font-bold text-xs mb-2 uppercase tracking-widest flex items-center justify-center md:justify-start gap-2">
-                        <Compass className="w-4 h-4" /> Featured This Week
-                      </p>
-                      <h1 className="text-3xl md:text-5xl font-serif font-bold text-text mb-3 leading-tight">{featuredBook.title}</h1>
-                      <p className="text-text-muted max-w-lg line-clamp-2 md:line-clamp-3 mb-6">{featuredBook.author}</p>
-                      <button onClick={() => navigate(`/books/${featuredBook.isbn || encodeURIComponent(featuredBook.title)}`, { state: { book: featuredBook } })} className="bg-primary text-white px-8 py-3 rounded-xl font-medium hover:bg-primary-hover transition-colors shadow-sm">
-                        Read Now
-                      </button>
+            <ThemeToggle />
+          </header>
+
+          <div className="flex-1 overflow-y-auto p-6 md:p-8 pb-20">
+            {isLoading ? (
+              <div className="space-y-12">
+                <div className="h-64 bg-surface rounded-3xl animate-pulse"></div>
+                {[1, 2, 3].map(i => <div key={i} className="h-64 bg-surface rounded-2xl animate-pulse"></div>)}
+              </div>
+            ) : fantasyBooks.length === 0 ? (
+              <EmptyState 
+                icon={<Compass className="w-8 h-8" />}
+                title="Nothing to discover yet"
+                description="Add a few books to your library so we can find more for you."
+                action={{ label: "Go to Library", onClick: () => navigate('/library') }}
+              />
+            ) : (
+              <div className="max-w-7xl mx-auto">
+                
+                {featuredBook && (
+                  <div className="relative w-full h-[340px] rounded-3xl overflow-hidden mb-12 border border-border shadow-lg group">
+                    <img src={featuredBook.coverUrl} className="absolute inset-0 w-full h-full object-cover blur-2xl opacity-40 scale-110" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/80 to-transparent" />
+                    <div className="relative z-10 h-full flex flex-col md:flex-row items-center md:items-end p-8 md:p-10 gap-8">
+                      <img src={featuredBook.coverUrl} className="w-32 h-48 md:w-40 md:h-60 rounded-xl shadow-2xl border-2 border-white/20 object-cover group-hover:scale-105 transition-transform duration-500" />
+                      <div className="pb-2 text-center md:text-left">
+                        <p className="text-primary font-bold text-xs mb-2 uppercase tracking-widest flex items-center justify-center md:justify-start gap-2">
+                          <Compass className="w-4 h-4" /> Featured This Week
+                        </p>
+                        <h1 className="text-3xl md:text-5xl font-serif font-bold text-text mb-3 leading-tight">{featuredBook.title}</h1>
+                        <p className="text-text-muted max-w-lg line-clamp-2 md:line-clamp-3 mb-6">{featuredBook.author}</p>
+                        <button onClick={() => navigate(`/books/${featuredBook.isbn || encodeURIComponent(featuredBook.title)}`, { state: { book: featuredBook } })} className="bg-primary text-white px-8 py-3 rounded-xl font-medium hover:bg-primary-hover transition-colors shadow-sm">
+                          Read Now
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              <DiscoverRow title="Trending Fantasy" subtitle="Epic worlds and magical adventures" books={fantasyBooks} isLoading={fantasyLoading} />
-              <DiscoverRow title="Popular in Kannada" subtitle="Must-reads from Kannada literature" books={kannadaBooks} isLoading={kannadaLoading} />
-              <DiscoverRow title="Popular in Tamil" subtitle="Classics and new releases" books={tamilBooks} isLoading={tamilLoading} />
-              <DiscoverRow title="Mystery & Thriller" subtitle="Edge-of-your-seat reads" books={mysteryBooks} isLoading={mysteryLoading} />
-              <DiscoverRow title="Romance" subtitle="Love stories to warm your heart" books={romanceBooks} isLoading={romanceLoading} />
-            </div>
-          )}
-        </div>
-      </main>
-    </div>
+                <DiscoverRow title="Trending Fantasy" subtitle="Epic worlds and magical adventures" books={fantasyBooks} isLoading={fantasyLoading} />
+                <DiscoverRow title="Popular in Kannada" subtitle="Must-reads from Kannada literature" books={kannadaBooks} isLoading={kannadaLoading} />
+                <DiscoverRow title="Popular in Tamil" subtitle="Classics and new releases" books={tamilBooks} isLoading={tamilLoading} />
+                <DiscoverRow title="Mystery & Thriller" subtitle="Edge-of-your-seat reads" books={mysteryBooks} isLoading={mysteryLoading} />
+                <DiscoverRow title="Romance" subtitle="Love stories to warm your heart" books={romanceBooks} isLoading={romanceLoading} />
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
+    </>
   );
 }

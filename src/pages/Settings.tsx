@@ -1,18 +1,29 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Sidebar } from '../components/Sidebar';
 import ThemeToggle from '../components/ThemeToggle';
-import { User, Settings as SettingsIcon, Shield, Bell, Trash2, ChevronRight, Lock } from 'lucide-react';
+import { User, Settings as SettingsIcon, Shield, Bell, ChevronRight, Lock, BookOpen, Flame, Clock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { motion } from 'framer-motion';
 import { AccountSettingsModal } from '../components/AccountSettingsModal';
-import { PublicProfileSettings } from '../components/PublicProfileSettings'; // 🔥 Import the new component
+import { PublicProfileSettings } from '../components/PublicProfileSettings';
+import { getMyLibrary, getSessionStats } from '../api/library';
 
 export default function Settings() {
   const { user } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<'overview' | 'public' | 'settings'>('settings');
   const [modalType, setModalType] = useState<'profile' | 'email' | 'password' | null>(null);
+
+  // 🔥 Fetch data for the Overview tab
+  const { data: books = [] } = useQuery({ queryKey: ['library'], queryFn: getMyLibrary });
+  const { data: sessions = [] } = useQuery({ queryKey: ['sessionStats'], queryFn: getSessionStats });
+
+  const totalBooks = books.length;
+  const finishedBooks = books.filter(b => b.status === 'Finished').length;
+  const totalPagesRead = sessions.reduce((sum, s) => sum + s.pagesRead, 0);
+  const activeDays = sessions.filter(s => s.pagesRead > 0).length;
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: User },
@@ -30,15 +41,15 @@ export default function Settings() {
           <ThemeToggle />
         </header>
 
-        <div className="flex-1 overflow-y-auto p-6 md:p-8">
+        <div className="flex-1 overflow-y-auto p-6 md:p-8 pb-24 md:pb-8">
           <div className="max-w-3xl mx-auto">
             
             {/* Tabs */}
-            <div className="flex border-b border-border mb-8">
+            <div className="flex border-b border-border mb-8 overflow-x-auto scrollbar-hide">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 return (
-                  <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex items-center gap-2 px-6 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.id ? 'border-primary text-primary' : 'border-transparent text-text-muted hover:text-text'}`}>
+                  <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex items-center gap-2 px-6 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id ? 'border-primary text-primary' : 'border-transparent text-text-muted hover:text-text'}`}>
                     <Icon className="w-4 h-4" /> {tab.label}
                   </button>
                 );
@@ -48,14 +59,55 @@ export default function Settings() {
             {/* Content */}
             <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
               
+              {/* 🔥 OVERVIEW TAB */}
+              {activeTab === 'overview' && (
+                <div className="space-y-8">
+                  <div className="bg-surface border border-border rounded-2xl p-6 flex items-center gap-6 shadow-sm">
+                    <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center text-primary text-3xl font-bold font-serif flex-shrink-0">
+                      {user?.displayName?.charAt(0).toUpperCase() || 'R'}
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-serif font-bold text-text">{user?.displayName}</h2>
+                      <p className="text-sm text-text-muted mt-1">{user?.email}</p>
+                      <p className="text-xs text-primary mt-2 font-medium">Member since 2026</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-surface border border-border rounded-xl p-4 flex flex-col items-center justify-center text-center">
+                      <BookOpen className="w-6 h-6 text-blue-500 mb-2" />
+                      <p className="text-2xl font-bold font-serif">{totalBooks}</p>
+                      <p className="text-xs text-text-muted uppercase tracking-wider mt-1">Books</p>
+                    </div>
+                    <div className="bg-surface border border-border rounded-xl p-4 flex flex-col items-center justify-center text-center">
+                      <Shield className="w-6 h-6 text-green-500 mb-2" />
+                      <p className="text-2xl font-bold font-serif">{finishedBooks}</p>
+                      <p className="text-xs text-text-muted uppercase tracking-wider mt-1">Finished</p>
+                    </div>
+                    <div className="bg-surface border border-border rounded-xl p-4 flex flex-col items-center justify-center text-center">
+                      <Clock className="w-6 h-6 text-purple-500 mb-2" />
+                      <p className="text-2xl font-bold font-serif">{totalPagesRead}</p>
+                      <p className="text-xs text-text-muted uppercase tracking-wider mt-1">Pages Read</p>
+                    </div>
+                    <div className="bg-surface border border-border rounded-xl p-4 flex flex-col items-center justify-center text-center">
+                      <Flame className="w-6 h-6 text-orange-500 mb-2" />
+                      <p className="text-2xl font-bold font-serif">{activeDays}</p>
+                      <p className="text-xs text-text-muted uppercase tracking-wider mt-1">Active Days</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 🔥 PUBLIC TAB */}
+              {activeTab === 'public' && <PublicProfileSettings />}
+              
+              {/* SETTINGS TAB */}
               {activeTab === 'settings' && (
                 <div className="space-y-8">
-                  {/* Account */}
                   <section>
                     <h2 className="text-sm font-bold text-text-muted uppercase tracking-wider mb-3">Account</h2>
                     <div className="bg-surface border border-border rounded-xl divide-y divide-border overflow-hidden">
                       
-                      {/* 🔥 Profile Button */}
                       <button onClick={() => setModalType('profile')} className="w-full flex items-center justify-between p-4 hover:bg-bg transition-colors">
                         <div className="flex items-center gap-3">
                           <User className="w-5 h-5 text-text-muted" />
@@ -64,19 +116,17 @@ export default function Settings() {
                         <ChevronRight className="w-5 h-5 text-text-muted" />
                       </button>
 
-                      {/* 🔥 Email Button */}
                       <button onClick={() => setModalType('email')} className="w-full flex items-center justify-between p-4 hover:bg-bg transition-colors">
                         <div className="flex items-center gap-3">
                           <Bell className="w-5 h-5 text-text-muted" />
                           <span>Email</span>
                         </div>
                         <div className="flex items-center gap-2 text-sm text-text-muted">
-                          <span>{user?.email}</span>
+                          <span className="hidden sm:inline">{user?.email}</span>
                           <ChevronRight className="w-5 h-5" />
                         </div>
                       </button>
 
-                      {/* 🔥 Password Button */}
                       <button onClick={() => setModalType('password')} className="w-full flex items-center justify-between p-4 hover:bg-bg transition-colors">
                         <div className="flex items-center gap-3">
                           <Lock className="w-5 h-5 text-text-muted" />
@@ -88,7 +138,6 @@ export default function Settings() {
                     </div>
                   </section>
 
-                  {/* Appearance */}
                   <section>
                     <h2 className="text-sm font-bold text-text-muted uppercase tracking-wider mb-3">Appearance</h2>
                     <div className="bg-surface border border-border rounded-xl p-4">
@@ -103,33 +152,14 @@ export default function Settings() {
                       </div>
                     </div>
                   </section>
-
-                  {/* Danger Zone */}
-                  <section>
-                    <h2 className="text-sm font-bold text-red-500 uppercase tracking-wider mb-3">Danger Zone</h2>
-                    <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-4 flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-text">Delete Account</p>
-                        <p className="text-xs text-text-muted mt-1">This will permanently delete your account and all data.</p>
-                      </div>
-                      <button className="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-600 transition-colors">Delete</button>
-                    </div>
-                  </section>
                 </div>
               )}
-
-              {activeTab === 'overview' && <div className="text-center py-12 text-text-muted">Overview stats coming soon.</div>}
-              
-              {/* 🔥 Integrated Public Profile Settings */}
-              {activeTab === 'public' && <PublicProfileSettings />}
-              
             </motion.div>
 
           </div>
         </div>
       </main>
 
-      {/* 🔥 Render the Modal */}
       {modalType && <AccountSettingsModal type={modalType} onClose={() => setModalType(null)} />}
     </div>
   );

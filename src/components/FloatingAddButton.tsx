@@ -33,6 +33,7 @@ export function FloatingAddButton() {
           initial={{ opacity: 0, y: 50 }} 
           animate={{ opacity: 1, y: 0 }} 
           exit={{ opacity: 0, y: 50 }} 
+          // 🔥 This class handles the positioning perfectly (above MobileNav on mobile)
           className="fixed bottom-24 md:bottom-8 right-6 md:right-8 z-50 flex flex-col items-end gap-3"
         >
           <AnimatePresence>

@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { BookOpen, Users, Settings, LogOut, ChevronLeft, ChevronRight, Home, Compass, Sparkles, Activity } from 'lucide-react';
+import { 
+  BookOpen, Users, Settings, LogOut, ChevronLeft, ChevronRight, 
+  Home, Compass, Sparkles, Activity, BarChart3 // 🔥 Added BarChart3
+} from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { SpineLogo } from './SpineLogo';
@@ -22,6 +25,8 @@ export function Sidebar() {
     { label: 'My Library', icon: BookOpen, path: '/library' },
     { label: 'Discover', icon: Compass, path: '/discover' },
     { label: 'For You', icon: Sparkles, path: '/for-you' },
+    { label: 'Stats', icon: BarChart3, path: '/stats' }, // 🔥 Added Stats here
+    {label: 'Wrapped', icon: Activity, path: '/wrapped' } // 🔥 Added Wrapped here
   ];
 
   const socialNav = [
