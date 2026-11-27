@@ -4,7 +4,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Helmet } from 'react-helmet-async';
 import { apiClient } from '../api/client';
 import { Sidebar } from '../components/Sidebar';
-import { ArrowLeft, Heart, Share2, BookOpen, RefreshCw, Trash2, PenLine, TrendingUp } from 'lucide-react';
+import { 
+  ArrowLeft, Heart, Share2, BookOpen, RefreshCw, Trash2, 
+  PenLine, TrendingUp, ArrowUpRight, DollarSign, Gift 
+} from 'lucide-react';
 import { LanguageBadge } from '../components/LanguageBadge';
 import { motion } from 'framer-motion';
 import { cn } from '../lib/utils';
@@ -76,12 +79,7 @@ export default function BookDetails() {
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
       if (!userBook) return;
-      await apiClient.put(`/api/UserBooks/${userBook.id}`, {
-        status: userBook.status, currentPage: userBook.currentPage,
-        personalRating: userBook.personalRating, privateNotes: userBook.privateNotes,
-        lentTo: userBook.lentTo, ownership: userBook.ownership,
-        ...data
-      });
+      await apiClient.put(`/api/UserBooks/${userBook.id}`, data);
     },
     onMutate: async (newData) => {
       await queryClient.cancelQueries({ queryKey: ['library'] });
@@ -90,6 +88,10 @@ export default function BookDetails() {
         old?.map((b: any) => b.id === userBook.id ? { ...b, ...newData } : b)
       );
       return { previous };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['library'] });
+      toast.success('Updated successfully');
     },
     onError: (err, newData, context) => {
       if (context?.previous) queryClient.setQueryData(['library'], context.previous);
@@ -121,6 +123,26 @@ export default function BookDetails() {
   const hasDescription = book?.description && book.description.trim().length > 0;
   const gradients = ['from-indigo-500 to-purple-600', 'from-emerald-500 to-teal-600', 'from-rose-500 to-pink-600', 'from-amber-500 to-orange-600'];
   const gradientClass = gradients[(book?.title?.charCodeAt(0) || 0) % gradients.length];
+
+  // Ownership Badge Helper
+  const renderOwnershipBadge = () => {
+    if (!userBook || userBook.ownership === 'Owned') return null;
+    
+    let icon = null;
+    let color = '';
+    let label = '';
+
+    if (userBook.ownership === 'Wishlist') { icon = <Heart className="w-3.5 h-3.5" />; color = 'text-pink-500 bg-pink-500/10 border-pink-500/20'; label = 'Wishlist'; }
+    if (userBook.ownership === 'LentOut') { icon = <ArrowUpRight className="w-3.5 h-3.5" />; color = 'text-orange-500 bg-orange-500/10 border-orange-500/20'; label = 'Lent Out'; }
+    if (userBook.ownership === 'Sold') { icon = <DollarSign className="w-3.5 h-3.5" />; color = 'text-green-500 bg-green-500/10 border-green-500/20'; label = 'Sold'; }
+    if (userBook.ownership === 'Donated') { icon = <Gift className="w-3.5 h-3.5" />; color = 'text-blue-500 bg-blue-500/10 border-blue-500/20'; label = 'Donated'; }
+
+    return (
+      <div className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium mt-2", color)}>
+        {icon} {label}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -190,10 +212,7 @@ export default function BookDetails() {
                                 <span className="text-primary font-bold">{Math.round(progressPercent)}%</span>
                               </div>
                               <div className="h-2 w-full bg-border rounded-full overflow-hidden">
-                                <div 
-                                  className="h-full bg-primary rounded-full transition-all duration-500 ease-out" 
-                                  style={{ width: `${progressPercent}%` }} 
-                                />
+                                <div className="h-full bg-primary rounded-full transition-all duration-500 ease-out" style={{ width: `${progressPercent}%` }} />
                               </div>
                               <p className="text-[11px] text-text-muted mt-2 font-medium text-right">
                                 Page {currentPage} of {totalPages}
@@ -201,7 +220,39 @@ export default function BookDetails() {
                             </div>
                           )}
 
-                          <button onClick={() => setIsLogSessionOpen(true)} className="w-full bg-primary text-white py-3 rounded-xl font-medium hover:bg-primary-hover transition-colors shadow-sm flex items-center justify-center gap-2">
+                          {/* 🔥 STATUS & OWNERSHIP DROPDOWNS */}
+                          <div className="grid grid-cols-2 gap-2 w-full pt-2 border-t border-border/50">
+                            <div>
+                              <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1 block">Status</label>
+                              <select
+                                value={userBook.status || 'Unread'}
+                                onChange={(e) => updateMutation.mutate({ status: e.target.value })}
+                                className="w-full text-xs p-1.5 rounded-lg bg-bg border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer appearance-none font-medium"
+                              >
+                                <option value="Unread">Unread</option>
+                                <option value="Reading">Reading</option>
+                                <option value="Paused">Paused</option>
+                                <option value="Finished">Finished</option>
+                                <option value="DNF">DNF</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1 block">Ownership</label>
+                              <select
+                                value={userBook.ownership || 'Owned'}
+                                onChange={(e) => updateMutation.mutate({ ownership: e.target.value })}
+                                className="w-full text-xs p-1.5 rounded-lg bg-bg border border-border focus:outline-none focus:ring-2 focus:ring-primary/20 cursor-pointer appearance-none font-medium"
+                              >
+                                <option value="Owned">Owned</option>
+                                <option value="Wishlist">Wishlist</option>
+                                <option value="LentOut">Lent Out</option>
+                                <option value="Sold">Sold</option>
+                                <option value="Donated">Donated</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <button onClick={() => setIsLogSessionOpen(true)} className="w-full bg-primary text-white py-3 rounded-xl font-medium hover:bg-primary-hover transition-colors shadow-sm flex items-center justify-center gap-2 mt-2">
                             <PenLine className="w-4 h-4" /> Log Session
                           </button>
                           
@@ -237,8 +288,13 @@ export default function BookDetails() {
 
                   <div className="md:col-span-2 space-y-6 mt-8 md:mt-40">
                     <div>
-                      <h1 className="text-4xl md:text-5xl font-serif font-bold text-text leading-tight mb-2">{book.title}</h1>
+                      <div className="flex items-center gap-3 mb-2">
+                        <h1 className="text-4xl md:text-5xl font-serif font-bold text-text leading-tight">{book.title}</h1>
+                      </div>
                       <p className="text-xl text-text-muted">by <span className="text-primary font-medium">{book.author}</span></p>
+                      
+                      {/* 🔥 Ownership Badge */}
+                      {renderOwnershipBadge()}
                     </div>
                     
                     {book.seriesName && (

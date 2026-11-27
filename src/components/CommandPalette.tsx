@@ -39,10 +39,7 @@ export function CommandPalette() {
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] bg-black/50 backdrop-blur-sm"
-      onClick={() => setOpen(false)}
-    >
+    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] bg-black/50 backdrop-blur-sm" onClick={() => setOpen(false)}>
       <div onClick={(e) => e.stopPropagation()} className="w-full max-w-xl">
         <Command className="bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden" loop>
           <div className="flex items-center gap-3 px-4 border-b border-border">
@@ -58,7 +55,6 @@ export function CommandPalette() {
             <Command.Empty className="p-4 text-center text-sm text-text-muted">No results found.</Command.Empty>
 
             <Command.Group heading="Navigation" className="text-xs text-text-muted px-2 py-1.5">
-              {/* 🔥 FIX: Changed '/' to '/dashboard' */}
               <Item icon={<Home className="w-4 h-4" />} label="Dashboard" onSelect={() => runCommand(() => navigate('/dashboard'))} />
               <Item icon={<Library className="w-4 h-4" />} label="My Library" onSelect={() => runCommand(() => navigate('/library'))} />
               <Item icon={<Compass className="w-4 h-4" />} label="Discover Books" onSelect={() => runCommand(() => navigate('/discover'))} />
@@ -78,9 +74,23 @@ export function CommandPalette() {
             </Command.Group>
           </Command.List>
 
-          <div className="border-t border-border px-4 py-2 flex items-center justify-between text-xs text-text-muted">
-            <span>Navigate with ↑ ↓ · Enter to select</span>
-            <span className="font-mono">ESC to close</span>
+          {/* 🔥 Keyboard Shortcuts Footer */}
+          <div className="border-t border-border px-4 py-3 flex items-center justify-between text-xs text-text-muted bg-bg/50">
+            <div className="flex items-center gap-4">
+              <span className="flex items-center gap-1.5">
+                <kbd className="px-2 py-0.5 rounded-md bg-surface border border-border font-sans text-[10px] font-bold">↑</kbd>
+                <kbd className="px-2 py-0.5 rounded-md bg-surface border border-border font-sans text-[10px] font-bold">↓</kbd>
+                to navigate
+              </span>
+              <span className="flex items-center gap-1.5">
+                <kbd className="px-2 py-0.5 rounded-md bg-surface border border-border font-sans text-[10px] font-bold">↵</kbd>
+                to select
+              </span>
+            </div>
+            <span className="flex items-center gap-1.5">
+              <kbd className="px-2 py-0.5 rounded-md bg-surface border border-border font-sans text-[10px] font-bold">ESC</kbd>
+              to close
+            </span>
           </div>
         </Command>
       </div>

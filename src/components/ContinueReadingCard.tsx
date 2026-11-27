@@ -1,68 +1,65 @@
 import { useState } from 'react';
-import { BookOpen, Clock } from 'lucide-react';
-import type { UserBook } from '../api/types';
-import { LanguageBadge } from './LanguageBadge';
-import { LogSessionModal } from './LogSessionModal';
-import { UpdateProgressModal } from './UpdateProgressModal';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { BookOpen, PenLine } from 'lucide-react';
+import type { UserBook } from '../api/types';
+import { LogSessionModal } from './LogSessionModal';
 
 export function ContinueReadingCard({ book }: { book: UserBook }) {
-  const [showLogSession, setShowLogSession] = useState(false);
-  const [showUpdateProgress, setShowUpdateProgress] = useState(false);
-
-  const progress = book.totalPages ? Math.min(100, (book.currentPage / book.totalPages) * 100) : 0;
+  const navigate = useNavigate();
+  const [isLogSessionOpen, setIsLogSessionOpen] = useState(false);
+  
+  const progress = book.totalPages ? Math.min(100, ((book.currentPage || 0) / book.totalPages) * 100) : 0;
 
   return (
     <>
-      <div className="bg-surface border border-border rounded-2xl p-5 flex gap-5 shadow-sm hover:shadow-md transition-all">
-        {/* Cover */}
-        <div className="w-24 h-36 flex-shrink-0 rounded-lg overflow-hidden bg-bg border border-border relative shadow-sm">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+        className="relative overflow-hidden bg-surface border border-border rounded-3xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-6 group hover:border-primary/30 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5"
+      >
+        <div className="w-24 h-36 md:w-32 md:h-48 flex-shrink-0 rounded-xl overflow-hidden shadow-md">
           {book.coverUrl ? (
-            <img src={book.coverUrl} alt={book.title} className="w-full h-full object-cover" />
+            <img src={book.coverUrl} alt={book.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-primary/40"><BookOpen className="w-8 h-8" /></div>
+            <div className="w-full h-full bg-primary/10 flex items-center justify-center"><BookOpen className="w-8 h-8 text-primary/40" /></div>
           )}
-          <div className="absolute bottom-1 left-1">
-            <LanguageBadge code={book.language || 'en'} />
-          </div>
         </div>
-
-        {/* Details */}
-        <div className="flex-1 flex flex-col justify-between">
-          <div>
-            <h3 className="font-serif font-bold text-lg leading-tight line-clamp-1">{book.title}</h3>
-            <p className="text-sm text-text-muted mb-2">{book.author}</p>
-            
-            {/* Progress Ring / Bar */}
-            <div className="flex items-center gap-3 mt-4">
-              <div className="relative w-10 h-10 flex items-center justify-center">
-                <svg className="w-full h-full transform -rotate-90">
-                  <circle cx="20" cy="20" r="16" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-border" />
-                  <circle cx="20" cy="20" r="16" stroke="currentColor" strokeWidth="4" fill="transparent" strokeDasharray={100} strokeDashoffset={100 - progress} className="text-primary transition-all duration-1000 ease-out" />
-                </svg>
-                <span className="absolute text-[10px] font-bold">{Math.round(progress)}%</span>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-text">Page {book.currentPage} of {book.totalPages || '?'}</p>
-                <p className="text-[10px] text-text-muted">You're {Math.round(progress)}% through</p>
-              </div>
+        
+        <div className="flex-1 text-center md:text-left min-w-0 w-full">
+          <p className="text-xs font-bold text-primary uppercase tracking-widest mb-1">Continue Reading</p>
+          <h3 className="text-2xl font-serif font-bold text-text truncate">{book.title}</h3>
+          <p className="text-sm text-text-muted mt-1">{book.author}</p>
+          
+          <div className="mt-6">
+            <div className="flex justify-between text-xs font-medium mb-2">
+              <span className="text-text-muted">Page {book.currentPage || 0} of {book.totalPages || '?'}</span>
+              <span className="text-primary">{Math.round(progress)}%</span>
+            </div>
+            <div className="h-2.5 bg-bg rounded-full overflow-hidden shadow-inner">
+              <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${progress}%` }}></div>
             </div>
           </div>
-
-          {/* Actions */}
-          <div className="flex items-center gap-2 mt-4">
-            <motion.button whileTap={{ scale: 0.96 }} onClick={() => setShowLogSession(true)} className="flex-1 bg-primary/10 text-primary py-1.5 rounded-lg text-xs font-medium hover:bg-primary/20 transition-colors flex items-center justify-center gap-1">
-              <Clock className="w-3 h-3" /> Log Session
-            </motion.button>
-            <motion.button whileTap={{ scale: 0.96 }} onClick={() => setShowUpdateProgress(true)} className="flex-1 bg-surface border border-border text-text py-1.5 rounded-lg text-xs font-medium hover:bg-bg transition-colors">
-              Update Progress
-            </motion.button>
+          
+          <div className="flex gap-3 mt-6">
+            <button 
+              onClick={() => setIsLogSessionOpen(true)}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-primary text-white px-6 py-3 rounded-xl font-medium hover:bg-primary-hover transition-colors shadow-sm"
+            >
+              <PenLine className="w-4 h-4" /> Log Session
+            </button>
+            <button 
+              onClick={() => navigate(`/books/${book.id}`)}
+              className="flex-1 md:flex-none bg-surface border border-border text-text px-6 py-3 rounded-xl font-medium hover:border-primary transition-colors"
+            >
+              Details
+            </button>
           </div>
         </div>
-      </div>
+      </motion.div>
 
-      {showLogSession && <LogSessionModal book={book} onClose={() => setShowLogSession(false)} />}
-      {showUpdateProgress && <UpdateProgressModal book={book} onClose={() => setShowUpdateProgress(false)} />}
+      {isLogSessionOpen && (
+        <LogSessionModal book={book} onClose={() => setIsLogSessionOpen(false)} />
+      )}
     </>
   );
 }

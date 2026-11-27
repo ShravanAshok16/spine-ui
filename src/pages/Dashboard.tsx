@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, ArrowRight, BookOpen, Flame } from 'lucide-react';
+import { Plus, ArrowRight, BookOpen, Flame, Sparkles, Heart, ArrowUpRight } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Helmet } from 'react-helmet-async';
@@ -53,8 +53,25 @@ export default function Dashboard() {
         .sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime()),
     [books]
   );
+  
   const continueReadingBook = readingBooks.length > 0 ? readingBooks[0] : null;
   const favouriteBooks = useMemo(() => books.filter((b) => b.isFavourite), [books]);
+
+  // 🔥 NEW: Filter books by Ownership
+  const wishlistBooks = useMemo(() => books.filter((b) => b.ownership === 'Wishlist'), [books]);
+  const lentOutBooks = useMemo(() => books.filter((b) => b.ownership === 'LentOut'), [books]);
+
+  // 🔥 Excludes Finished books for recommendations
+  const recommendedBooks = useMemo(() => {
+    return books
+      .filter(b => b.status !== 'Finished' && b.status !== 'DNF')
+      .sort((a, b) => {
+        if (a.ownership === 'Wishlist' && b.ownership !== 'Wishlist') return -1;
+        if (b.ownership === 'Wishlist' && a.ownership !== 'Wishlist') return 1;
+        return new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime();
+      })
+      .slice(0, 6);
+  }, [books]);
 
   const booksFinishedThisYear = useMemo(() => {
     const currentYear = new Date().getFullYear();
@@ -97,8 +114,7 @@ export default function Dashboard() {
           <Sidebar />
         </div>
         <main className="flex-1 flex flex-col min-w-0">
-          {/* 🔥 FIXED HEADER */}
-          <header className="h-20 border-b border-border bg-surface/80 backdrop-blur-md shadow-[0_1px_12px_-4px] shadow-primary/20 flex items-center justify-between px-4 md:px-8 gap-4 flex-shrink-0 relative z-10">
+          <header className="h-20 border-b border-border bg-surface/80 backdrop-blur-md shadow-[0_1px_12px_-4px] shadow-primary/20 flex items-center justify-between px-6 md:px-8 gap-4 flex-shrink-0 relative z-10">
             <div className="flex flex-col min-w-0">
               <h1 className="text-xl md:text-2xl font-serif font-bold text-text truncate">
                 {getGreeting()},{' '}
@@ -112,7 +128,6 @@ export default function Dashboard() {
             <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
               <NotificationBell />
               <ThemeToggle />
-              {/* 🔥 Hide the big Add button on mobile, since we have the FloatingAddButton */}
               <motion.button
                 whileTap={{ scale: 0.96 }}
                 onClick={openAddModal}
@@ -123,7 +138,6 @@ export default function Dashboard() {
             </div>
           </header>
 
-          {/* 🔥 INCREASED BOTTOM PADDING on mobile (pb-32) so MobileNav doesn't cover content */}
           <div className="flex-1 overflow-y-auto p-4 md:p-8 pb-32 md:pb-12">
             {booksLoading || statsLoading ? (
               <div className="animate-pulse space-y-8">
@@ -131,6 +145,8 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="max-w-7xl mx-auto space-y-6 md:space-y-8 pb-12">
+                
+                {/* 1. TOP SECTION (Continue Reading + Quote + Goal) */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div className="lg:col-span-2 space-y-6">
                     {continueReadingBook ? (
@@ -173,9 +189,7 @@ export default function Dashboard() {
                       <div className="mt-6">
                         <div className="flex justify-between text-xs mb-1.5 font-medium">
                           <span>Progress</span>
-                          <span>
-                            {booksFinishedThisYear} / {goalTarget}
-                          </span>
+                          <span>{booksFinishedThisYear} / {goalTarget}</span>
                         </div>
                         <div className="h-2 bg-bg rounded-full overflow-hidden">
                           <div
@@ -188,14 +202,58 @@ export default function Dashboard() {
                   </div>
                 </div>
 
+                {/* 2. HEATMAP (Moved Up) */}
+                <div className="pt-2">
+                  <Heatmap data={sessionStats} />
+                </div>
+
+                {/* 3. OWNERSHIP CAROUSELS (Wishlist & Lent Out) */}
+                {wishlistBooks.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-xl font-serif font-bold flex items-center gap-2">
+                        <Heart className="w-5 h-5 text-pink-500 fill-pink-500" /> Your Wishlist
+                      </h2>
+                      <Link to="/library?ownership=Wishlist" className="text-sm text-primary hover:underline flex items-center gap-1">
+                        View All <ArrowRight className="w-4 h-4" />
+                      </Link>
+                    </div>
+                    <div className="flex gap-4 md:gap-6 overflow-x-auto pb-4 snap-x scrollbar-hide">
+                      {wishlistBooks.map((book, i) => (
+                        <div key={book.id} className="w-32 md:w-40 flex-shrink-0 snap-start">
+                          <BookCover book={book} index={i} onClick={() => navigate(`/books/${book.id}`)} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {lentOutBooks.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-xl font-serif font-bold flex items-center gap-2">
+                        <ArrowUpRight className="w-5 h-5 text-orange-500" /> Lent Out
+                      </h2>
+                      <Link to="/library?ownership=LentOut" className="text-sm text-primary hover:underline flex items-center gap-1">
+                        View All <ArrowRight className="w-4 h-4" />
+                      </Link>
+                    </div>
+                    <div className="flex gap-4 md:gap-6 overflow-x-auto pb-4 snap-x scrollbar-hide">
+                      {lentOutBooks.map((book, i) => (
+                        <div key={book.id} className="w-32 md:w-40 flex-shrink-0 snap-start">
+                          <BookCover book={book} index={i} onClick={() => navigate(`/books/${book.id}`)} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. FAVOURITES */}
                 {favouriteBooks.length > 0 && (
                   <div>
                     <div className="flex items-center justify-between mb-4">
                       <h2 className="text-xl font-serif font-bold">Your Favourites</h2>
-                      <Link
-                        to="/library"
-                        className="text-sm text-primary hover:underline flex items-center gap-1"
-                      >
+                      <Link to="/library?filter=favourites" className="text-sm text-primary hover:underline flex items-center gap-1">
                         View All <ArrowRight className="w-4 h-4" />
                       </Link>
                     </div>
@@ -209,31 +267,26 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                <div className="mt-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-xl font-serif font-bold">Recommended for You</h2>
-                    <Link
-                      to="/for-you"
-                      className="text-sm text-primary hover:underline flex items-center gap-1"
-                    >
-                      View All <ArrowRight className="w-4 h-4" />
-                    </Link>
-                  </div>
-                  <div className="flex gap-4 md:gap-6 overflow-x-auto pb-4 snap-x scrollbar-hide">
-                    {books
-                      .filter((b) => b.status === 'Finished')
-                      .slice(0, 6)
-                      .map((book, i) => (
+                {/* 5. RECOMMENDED FOR YOU */}
+                {recommendedBooks.length > 0 && (
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-xl font-serif font-bold flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-yellow-500" /> Recommended for You
+                      </h2>
+                      <Link to="/for-you" className="text-sm text-primary hover:underline flex items-center gap-1">
+                        View All <ArrowRight className="w-4 h-4" />
+                      </Link>
+                    </div>
+                    <div className="flex gap-4 md:gap-6 overflow-x-auto pb-4 snap-x scrollbar-hide">
+                      {recommendedBooks.map((book, i) => (
                         <div key={book.id} className="w-32 md:w-40 flex-shrink-0 snap-start">
                           <BookCover book={book} index={i} onClick={() => navigate(`/books/${book.id}`)} />
                         </div>
                       ))}
+                    </div>
                   </div>
-                </div>
-
-                <div className="pt-4">
-                  <Heatmap data={sessionStats} />
-                </div>
+                )}
 
                 <div className="text-center pt-8">
                   <Link

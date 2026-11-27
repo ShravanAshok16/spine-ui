@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Sidebar } from '../components/Sidebar';
 import ThemeToggle from '../components/ThemeToggle';
-import { Search, UserPlus, Check, X, Loader2 } from 'lucide-react';
+import { Search, UserPlus, Check, Loader2, Users } from 'lucide-react';
 import { apiClient } from '../api/client';
 import { toast } from 'sonner';
 import { NotificationBell } from '../components/NotificationBell';
@@ -12,7 +12,6 @@ export default function Friends() {
   const [searchQuery, setSearchQuery] = useState('');
   const queryClient = useQueryClient();
 
-  // Fetch Friends & Requests
   const { data: friends = [], isLoading: friendsLoading } = useQuery({
     queryKey: ['friends'],
     queryFn: async () => {
@@ -29,7 +28,6 @@ export default function Friends() {
     }
   });
 
-  // Search Users
   const { data: searchResults = [], isLoading: isSearching } = useQuery({
     queryKey: ['userSearch', searchQuery],
     queryFn: async () => {
@@ -63,7 +61,7 @@ export default function Friends() {
       <div className="flex-shrink-0 hidden md:block"><Sidebar /></div>
       
       <main className="flex-1 flex flex-col min-w-0">
-        <header className="h-20 border-b border-border bg-surface flex items-center justify-between px-6 md:px-8 flex-shrink-0 sticky top-0 z-20">
+        <header className="h-20 border-b border-border bg-surface/80 backdrop-blur-md flex items-center justify-between px-6 md:px-8 flex-shrink-0 sticky top-0 z-20">
           <h1 className="text-2xl font-serif font-bold text-text">Friends</h1>
           <div className="flex items-center gap-3">
             <NotificationBell />
@@ -71,10 +69,9 @@ export default function Friends() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-6 md:p-8">
+        <div className="flex-1 overflow-y-auto p-6 md:p-8 pb-32 md:pb-8">
           <div className="max-w-4xl mx-auto space-y-8">
             
-            {/* Search Bar */}
             <div className="relative group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted group-focus-within:text-primary" />
               <input
@@ -87,7 +84,6 @@ export default function Friends() {
               {isSearching && <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 animate-spin text-primary" />}
             </div>
 
-            {/* Search Results */}
             {searchQuery.length >= 2 && (
               <div className="bg-surface border border-border rounded-xl divide-y divide-border overflow-hidden">
                 {searchResults.length === 0 && !isSearching ? (
@@ -108,7 +104,6 @@ export default function Friends() {
               </div>
             )}
 
-            {/* Tabs */}
             <div className="flex border-b border-border">
               <button onClick={() => setActiveTab('friends')} className={`px-6 py-3 font-medium border-b-2 ${activeTab === 'friends' ? 'border-primary text-primary' : 'border-transparent text-text-muted'}`}>
                 My Friends ({friends.length})
@@ -118,22 +113,36 @@ export default function Friends() {
               </button>
             </div>
 
-            {/* Lists */}
             <div className="bg-surface border border-border rounded-xl divide-y divide-border overflow-hidden">
               {activeTab === 'friends' && (
                 friendsLoading ? <p className="p-4 text-center">Loading...</p> :
-                friends.length === 0 ? <p className="p-8 text-center text-text-muted">You haven't added any friends yet.</p> :
-                friends.map((f: any) => (
-                  <div key={f.friendshipId} className="flex items-center gap-4 p-4">
-                    <div className="w-10 h-10 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold">
-                      {f.displayName.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="font-medium">{f.displayName}</p>
-                      <p className="text-xs text-text-muted">{f.email}</p>
+                friends.length === 0 ? (
+                  // 🔥 Premium Empty State
+                  <div className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-surface to-surface border border-border rounded-3xl p-10 text-center my-6">
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent pointer-events-none" />
+                    <div className="relative">
+                      <div className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-primary/10 flex items-center justify-center">
+                        <Users className="w-8 h-8 text-primary" />
+                      </div>
+                      <h3 className="text-2xl font-serif font-bold mb-2">No friends yet</h3>
+                      <p className="text-sm text-text-muted mb-6 max-w-sm mx-auto">
+                        Search for readers above by name or email to start connecting.
+                      </p>
                     </div>
                   </div>
-                ))
+                ) : (
+                  friends.map((f: any) => (
+                    <div key={f.friendshipId} className="flex items-center gap-4 p-4">
+                      <div className="w-10 h-10 rounded-full bg-primary/20 text-primary flex items-center justify-center font-bold">
+                        {f.displayName.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="font-medium">{f.displayName}</p>
+                        <p className="text-xs text-text-muted">{f.email}</p>
+                      </div>
+                    </div>
+                  ))
+                )
               )}
 
               {activeTab === 'requests' && (
@@ -152,7 +161,6 @@ export default function Friends() {
                 ))
               )}
             </div>
-
           </div>
         </div>
       </main>

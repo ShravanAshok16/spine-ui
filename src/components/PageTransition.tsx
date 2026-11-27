@@ -1,15 +1,13 @@
-import { motion, useReducedMotion } from 'framer-motion';
-import { type ReactNode } from 'react';
+import { motion } from 'framer-motion';
+import type { ReactNode } from 'react';
 
 export function PageTransition({ children }: { children: ReactNode }) {
-  const shouldReduceMotion = useReducedMotion();
-
   return (
     <motion.div
-      initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, filter: 'blur(8px)' }}
-      animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, filter: 'blur(0px)' }}
-      exit={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, filter: 'blur(8px)' }}
-      transition={{ duration: 0.3, ease: 'easeInOut' }}
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
       className="h-full w-full"
     >
       {children}
